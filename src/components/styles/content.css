@@ -1,0 +1,28 @@
+.resources-page {
+  max-width: 800px;
+  margin: auto;
+  padding: 20px;
+}
+
+.resource-list .resource-item {
+  margin-bottom: 20px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.resource-item img {
+  float: left;
+  margin-right: 15px;
+  border-radius: 4px;
+}
+
+.resource-item a {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.resource-item p {
+  clear: both;
+  margin-top: 10px;
+}
