@@ -53,14 +53,12 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const clientId =
-      "556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com"; // Replace with your client ID
-    const apiKey = "AIzaSyDfNCiZBEE0pxF-7O8Tb7U7HWSPefje50Q"; // Replace with your API key
+      "556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com";
+    const apiKey = "AIzaSyDfNCiZBEE0pxF-7O8Tb7U7HWSPefje50Q";
     loadAuth2(gapi, clientId, apiKey)
       .then((auth2) => {
         setAuthInstance(auth2);
-        // Optionally check if the user is already signed in with Google when the app loads
         if (auth2.isSignedIn.get()) {
-          // Update your app state with the user's Google profile information
         }
       })
       .catch((error) => console.error("Error loading Google Auth2", error));

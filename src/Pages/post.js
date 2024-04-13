@@ -9,8 +9,7 @@ import {
 } from "firebase/firestore";
 import { useNavigate } from "react-router";
 import { firestore } from "../components/firebase/firebaseConfig";
-import { useAuth } from "../components/firebase/AuthContext"; // Adjust this path to where your AuthContext is defined
-import "../components/styles/poststyles.css";
+import { useAuth } from "../components/firebase/AuthContext";
 
 const Post = ({ post }) => {
   const navigate = useNavigate();
@@ -19,19 +18,20 @@ const Post = ({ post }) => {
   const [newComment, setNewComment] = useState("");
   const { currentUser } = useAuth();
   const [showComments, setShowComments] = useState(false); // New state to manage comments visibility
-  // This hook provides the current authenticated user
   const userId = userData?.uid;
   const navigateToUserProfile = (userId) => {
-    navigate(`/user/${userId}`); // Assuming your route to user profiles is set up like this
+    navigate(`/user/${userId}`); // Goes to users profile
   };
 
-  // Function to format the createdAt date
+  // Function to format the createdAt date for readability
   const formatDate = (date) => {
     if (date?.toDate) {
       return new Date(date.toDate()).toLocaleString();
     }
     return new Date(date).toLocaleString();
   };
+
+  // Fetches comments from Firestore collection
 
   useEffect(() => {
     const fetchComments = async () => {
@@ -42,14 +42,14 @@ const Post = ({ post }) => {
           // Renamed 'doc' to 'documentSnapshot'
           const commentData = documentSnapshot.data();
           // Fetch user data for each comment
-          const userRef = doc(firestore, "users", commentData.userId); // Now 'doc' correctly refers to the imported function
+          const userRef = doc(firestore, "users", commentData.userId);
           const userSnap = await getDoc(userRef);
           const userData = userSnap.exists()
             ? userSnap.data()
             : { fullName: "Unknown user", username: "Unknown" };
           return {
             ...commentData,
-            id: documentSnapshot.id, // Also updated here
+            id: documentSnapshot.id,
             userFullName: userData.fullName,
             username: userData.username,
             formattedDate: formatDate(commentData.createdAt),
@@ -63,8 +63,9 @@ const Post = ({ post }) => {
       // Only fetch comments if they are to be shown
       fetchComments();
     }
-  }, [post.id, showComments]); // Add showComments to the dependency array
+  }, [post.id, showComments]); // Adds showComments to the dependency array
 
+  // Function to handle comment submit for users
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
     if (!newComment.trim() || !currentUser) return;
@@ -84,11 +85,11 @@ const Post = ({ post }) => {
   };
 
   const handleSharePost = (e, postId) => {
-    e.stopPropagation(); // Prevent the post click event
+    e.stopPropagation(); // Prevents the post click event
 
     const postUrl = `${window.location.origin}/posts/${postId}`;
 
-    // Use Web Share API if available
+    // Uses Web Share API if available to share post
     if (navigator.share) {
       navigator
         .share({
@@ -97,7 +98,7 @@ const Post = ({ post }) => {
         })
         .catch((error) => console.log("Error sharing", error));
     } else {
-      // Fallback: Copy link to clipboard
+      // Copy link to clipboard if failed
       navigator.clipboard
         .writeText(postUrl)
         .then(() => {
@@ -108,74 +109,71 @@ const Post = ({ post }) => {
   };
 
   return (
-    <div>
-      {/* //   className="clickable-profile"
-    //   onClick={() => userId && navigateToUserProfile(userId)}
-    //  */}
-      <div className="post">
-        <p>{text}</p>
-        <p>
-          Posted by:
-          {/* Check if userData exists and then make fullName clickable */}
-          {userData ? (
-            <span
-              className="clickable-profile"
-              onClick={() => userId && navigateToUserProfile(userId)}
-              style={{ cursor: "pointer", textDecoration: "underline" }}
-            >
-              {userData.fullName}
-            </span>
-          ) : (
-            "No name provided"
-          )}
-          ({userData?.username || "Unknown"})
-        </p>
-        <p>Posted on: {formatDate(createdAt)}</p>
-        {image && (
-          <img
-            src={image}
-            alt="Post"
-            style={{ maxWidth: "100%", maxHeight: "300px" }}
-          />
-        )}
-        {video && (
-          <video
-            width="100%"
-            height="auto"
-            controls
-            style={{ maxWidth: "100%" }}
+    <div className="post">
+      <h3>{text}</h3>
+      <p>
+        Posted by:
+        {userData ? (
+          <span
+            className="clickable-profile"
+            onClick={() => userId && navigateToUserProfile(userId)}
+            style={{ cursor: "pointer", textDecoration: "underline" }}
           >
-            <source src={video} type="video/mp4" />
-          </video>
+            {userData.fullName}
+          </span>
+        ) : (
+          "No name provided"
         )}
-        {/* Display comments */}
-        {/* Button to toggle comments visibility */}
-        <button onClick={() => setShowComments(!showComments)}>
-          {showComments ? "Hide Comments" : "Show Comments"}
-        </button>
-        {/* Conditionally render comments */}
-        {showComments && (
-          <div className="comments">
-            <p>Replies:</p>
-            {comments.map((comment) => (
-              <p
-                key={comment.id}
-              >{`${comment.userFullName} (${comment.username}): ${comment.text} - ${comment.formattedDate}`}</p>
-            ))}
-          </div>
-        )}
-        {/* Add a comment form */}
-        <form onSubmit={handleCommentSubmit}>
+        ({userData?.username || "Unknown"})
+      </p>
+      <p>Posted on: {formatDate(createdAt)}</p>
+      {image && (
+        <img
+          src={image}
+          alt="Post"
+          style={{ maxWidth: "100%", maxHeight: "300px" }}
+        />
+      )}
+      {video && (
+        <video width="100%" height="auto" controls style={{ maxWidth: "100%" }}>
+          <source src={video} type="video/mp4" />
+        </video>
+      )}
+      {/* Display comments */}
+      {/* Button to toggle comments visibility */}
+      <button onClick={() => setShowComments(!showComments)} className="button">
+        {showComments ? "Hide Comments" : "Show Comments"}
+      </button>
+      {/* Conditionally render comments */}
+      {showComments && (
+        <div className="comments">
+          <p>Replies:</p>
+          {comments.map((comment) => (
+            <p
+              key={comment.id}
+            >{`${comment.userFullName} (${comment.username}): ${comment.text} - ${comment.formattedDate}`}</p>
+          ))}
+        </div>
+      )}
+      {/* Add a comment form */}
+      <form onSubmit={handleCommentSubmit}>
+        <p className="centre-text"> Reply to this post below.</p>
+        <div className="comment-container">
           <input
             type="text"
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             placeholder="Add a comment..."
+            className="comment-text"
           />
-          <button type="submit">Post</button>
-        </form>
-        <button onClick={(e) => handleSharePost(e, post.id)}>Share</button>
-      </div>
+        </div>
+        <button type="submit" className="button">
+          Post
+        </button>
+      </form>
+      <button onClick={(e) => handleSharePost(e, post.id)} className="button">
+        Share
+      </button>
     </div>
   );
 };

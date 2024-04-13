@@ -1,16 +1,15 @@
 import React, { useState } from "react";
-import { useAuth } from "../components/firebase/AuthContext.js";
+import { useAuth } from "../components/firebase/AuthContext";
+import emailjs from "emailjs-com";
 
 function ContactPage() {
   const { currentUser } = useAuth();
-  // Define state for each form field
   const [formData, setFormData] = useState({
     subject: "",
     description: "",
-    email: "",
+    email: currentUser?.email || "", // Default to current user's email if available
   });
 
-  // Update state on input change
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prevState) => ({
@@ -19,84 +18,87 @@ function ContactPage() {
     }));
   };
 
-  // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Here, you can perform the fetch operation to send form data
-    fetch("/send-contact-message", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData),
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        alert("Message sent successfully.");
-        // Optionally reset form fields here
-        setFormData({ subject: "", description: "", email: "" });
-      })
-      .catch((error) => {
-        console.error("Error:", error);
-        alert("Error sending message.");
-      });
+    // Check if the email field is filled
+    if (!formData.email) {
+      alert("Please enter your email address.");
+      return;
+    }
+
+    // Prepare parameters for EmailJS
+    const emailParams = {
+      to_email: formData.email, // Assuming 'to_email' is the parameter expected by your EmailJS template
+      subject: formData.subject,
+      description: formData.description,
+    };
+
+    emailjs
+      .send(
+        "service_hmbss4p",
+        "template_6huj8xr",
+        emailParams,
+        "qPX4lZbgV_2l9XtX7"
+      )
+      .then(
+        (response) => {
+          console.log(
+            "Message sent successfully",
+            response.status,
+            response.text
+          );
+          alert("Message sent successfully.");
+          setFormData({ subject: "", description: "", email: "" });
+        },
+        (error) => {
+          console.log("Failed to send message", error);
+          alert("Failed to send message.");
+        }
+      );
   };
 
-  // Render form
   return (
-    // <h2>Find Your Sound!</h2>
-    // <p>Gigify is a platform that connects local musicians and venues.</p>
-    // <p>
-    //   Musicians and Venues can create a profile and list their availability,
-    //   genre, and location. Allowing you to search for local musicians &
-    //   venues based on these criteria for gigs.
-    // </p>
-    // <p>
-    //   The goal of the platform is to empower local musicians and venues by
-    //   providing an intuitive platform that puts the power of booking in the
-    //   musicians hands and for venues, making the process of finding acts or
-    //   venues much easier with all the details and acts in one place.
-    // </p>
-    // <p>
-    //   If you're a musician or venue, sign up and try Gigify for your next
-    //   live music event!
-    // </p>
-    <form id="contactForm" onSubmit={handleSubmit}>
-      <div>
-        {currentUser ? (
-          <p>Welcome, {currentUser.fullName}</p> // Display user info
-        ) : (
-          <p>Please log in.</p>
-        )}
-        <label htmlFor="subject">Subject:</label>
-        <input
-          type="text"
-          id="subject"
-          name="subject"
-          value={formData.subject}
-          onChange={handleChange}
-        />
-      </div>
-      <div>
-        <label htmlFor="description">Description:</label>
-        <textarea
-          id="description"
-          name="description"
-          value={formData.description}
-          onChange={handleChange}
-        />
-      </div>
-      <div>
-        <label htmlFor="email">Email:</label>
-        <input
-          type="email"
-          id="email"
-          name="email"
-          value={formData.email}
-          onChange={handleChange}
-        />
-      </div>
-      <button type="submit">Send Message</button>
-    </form>
+    <div className="container">
+      <form id="contact-form" onSubmit={handleSubmit}>
+        <h1 className="centre-text">Contact Us</h1>
+        <p className="centre-text">
+          Hi! I hope you're enjoying Gigify, if you have any issues please don't
+          hesitate to contact us.
+        </p>
+        <div className="form-group">
+          <label htmlFor="subject">Subject:</label>
+          <input
+            type="text"
+            id="subject"
+            name="subject"
+            value={formData.subject}
+            onChange={handleChange}
+            className="input-text"
+          />
+          <label htmlFor="description">Description:</label>
+          <textarea
+            id="description"
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            className="textarea"
+          />
+          <label htmlFor="email">Your Email:</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            className="input-text"
+          />
+        </div>
+        <button type="submit" className="button">
+          Send Message
+        </button>
+      </form>
+    </div>
   );
 }
 

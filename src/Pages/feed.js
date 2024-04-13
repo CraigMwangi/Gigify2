@@ -5,10 +5,11 @@ import {
   doc,
   getDoc,
   getFirestore,
+  orderBy,
+  query,
 } from "firebase/firestore";
 import { firestore } from "../components/firebase/firebaseConfig";
 import Post from "./post";
-import PostForm from "./postForm";
 
 const Feed = () => {
   const [posts, setPosts] = useState([]);
@@ -41,7 +42,10 @@ const Feed = () => {
     const fetchPosts = async () => {
       setLoading(true);
       try {
-        const postsCollection = collection(firestore, "posts");
+        const postsCollection = query(
+          collection(firestore, "posts"),
+          orderBy("createdAt", "desc")
+        );
         const querySnapshot = await getDocs(postsCollection);
 
         const postsData = await Promise.all(
@@ -69,7 +73,7 @@ const Feed = () => {
   }, []);
 
   return (
-    <div className="feed">
+    <div className="feed-container">
       {loading ? (
         <p>Loading posts...</p>
       ) : (

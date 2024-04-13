@@ -3,12 +3,12 @@ import { collection, addDoc, Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { firestore, storage } from "../components/firebase/firebaseConfig";
 import { useAuth } from "../components/firebase/AuthContext";
-import axios from "axios";
+import axios from "axios"; // Dependency to allow geocoding event location
 
-const GOOGLE_MAPS_API_KEY = "AIzaSyAJP4EUYo_UsOFFPFHiIjcwU_OI77GQhIQ"; // Use environment variable for API Key
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY; // Environment variable for API Key
 
 function EventModal({ isOpen, onClose, onSave }) {
-  const [eventDetails, setEventDetails] = useState({
+  const [event, setEvent] = useState({
     title: "",
     start: "",
     end: "",
@@ -17,10 +17,11 @@ function EventModal({ isOpen, onClose, onSave }) {
     description: "",
     capacity: "",
     actsneeded: "",
-    // Remove photoURL from state as we'll handle photo file separately
+    email: "",
+    username: "",
+    latLng: { lat: null, lng: null },
   });
-  const [photo, setPhoto] = useState(null); // Handle photo file separately
-
+  const [photo, setPhoto] = useState(null);
   const { currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -28,10 +29,9 @@ function EventModal({ isOpen, onClose, onSave }) {
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === "photo") {
-      // Handle photo file separately
       setPhoto(e.target.files[0]);
     } else {
-      setEventDetails((prevDetails) => ({ ...prevDetails, [name]: value }));
+      setEvent((prevDetails) => ({ ...prevDetails, [name]: value }));
     }
   };
 
@@ -42,21 +42,21 @@ function EventModal({ isOpen, onClose, onSave }) {
         {
           params: {
             address: location,
-            key: GOOGLE_MAPS_API_KEY,
+            key: "AIzaSyAJP4EUYo_UsOFFPFHiIjcwU_OI77GQhIQ",
           },
         }
       );
       if (response.data.status === "OK") {
-        return response.data.results[0].geometry.location; // Return the location object with lat and lng
+        return response.data.results[0].geometry.location;
       } else {
-        console.error("Geocoding failed:", response.data.status);
-        setError("Geocoding failed. Please check the location.");
-        return null;
+        throw new Error(
+          "Geocoding failed, please add a valid location e.g. London: " +
+            response.data.status
+        );
       }
     } catch (error) {
-      console.error("Geocoding error:", error);
       setError("Geocoding error. Please try again.");
-      return null;
+      throw error; // Rethrow to handle it in calling function
     }
   };
 
@@ -64,60 +64,62 @@ function EventModal({ isOpen, onClose, onSave }) {
     e.preventDefault();
     setLoading(true);
 
-    // Geocode the location before saving the event
-    const latLng = await geocodeLocation(eventDetails.location);
-    if (!latLng) {
-      setLoading(false);
-      return; // Stop the submission if geocoding fails
-    }
-
-    // Validate start and end dates
-    const startDate = new Date(eventDetails.start);
-    const endDate = new Date(eventDetails.end);
-    if (startDate > endDate) {
-      setError("End date must be after start date.");
-      setLoading(false);
-      return;
-    }
-
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      setError("Invalid start or end date.");
-      setLoading(false);
-      return;
-    }
-
     try {
+      const latLng = await geocodeLocation(event.location);
+      setEvent((prev) => ({ ...prev, latLng }));
+      const startDate = new Date(event.start);
+      const endDate = new Date(event.end);
+      const now = new Date();
+
+      if (startDate < now) {
+        throw new Error("Event date cannot be in the past.");
+      }
+
+      if (startDate > endDate) {
+        throw new Error("End date must be after start date.");
+      }
+
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        throw new Error("Invalid start or end date.");
+      }
+
       let photoURL = "";
-      // Upload photo to Firebase Storage and get the URL
       if (photo) {
         const photoRef = ref(storage, `events/${Date.now()}_${photo.name}`);
         const snapshot = await uploadBytes(photoRef, photo);
         photoURL = await getDownloadURL(snapshot.ref);
       }
 
-      // Prepare event data including the photo URL
       const firestoreEvent = {
-        ...eventDetails,
+        ...event,
         type: "AppEvent",
         photoURL,
-        capacity: parseInt(eventDetails.capacity, 10), // Ensure capacity is stored as a number
+        capacity: parseInt(event.capacity, 10), // Ensure capacity is a number
         uid: currentUser.uid,
-        genre: eventDetails.genre,
+        genre: event.genre,
         email: currentUser.email,
         username: currentUser.displayName || "Anonymous",
-        start: Timestamp.fromDate(startDate), // Convert validated Date to Firestore Timestamp
-        end: Timestamp.fromDate(endDate), // Convert validated Date to Firestore Timestamp
+        start: Timestamp.fromDate(startDate),
+        end: Timestamp.fromDate(endDate),
+        latLng,
       };
 
-      // Save the event to Firestore
-      await addDoc(collection(firestore, "events"), firestoreEvent);
-
+      const docRef = await addDoc(
+        collection(firestore, "events"),
+        firestoreEvent
+      );
       alert("Event created successfully");
+
+      // Call onSave with the full event data including the new Firestore document ID
+      onSave({
+        id: docRef.id,
+        ...firestoreEvent,
+      });
+
       onClose(); // Close the modal
-      onSave(); // Trigger refresh of events list
     } catch (error) {
       console.error("Error creating new event: ", error);
-      setError("Failed to create new event.");
+      setError(error.message);
     } finally {
       setLoading(false);
     }
@@ -126,27 +128,21 @@ function EventModal({ isOpen, onClose, onSave }) {
   if (!isOpen) return null;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: "20%",
-        left: "30%",
-        backgroundColor: "white",
-        padding: "20px",
-        zIndex: 1000,
-      }}
-    >
-      <div className="modal-content">
+    <div className="event-modal-container">
+      <div className="close-button" onClick={onClose}>
+        X
+      </div>
+      <div className="event-modal-content">
         <h2>Create Your Event</h2>
+        <p className="centre-text">Events can be anytime, not just at night.</p>
         {error && <p style={{ color: "red" }}>{error}</p>}
-        <form onSubmit={handleSubmit}>
-          {/* Form fields for event details */}
+        <form onSubmit={handleSubmit} className="form">
           <label>
             Title:
             <input
               type="text"
               name="title"
-              value={eventDetails.title}
+              value={event.title}
               onChange={handleChange}
               required
             />
@@ -156,7 +152,7 @@ function EventModal({ isOpen, onClose, onSave }) {
             <input
               type="text"
               name="genre"
-              value={eventDetails.genre}
+              value={event.genre}
               onChange={handleChange}
               required
             />
@@ -166,7 +162,7 @@ function EventModal({ isOpen, onClose, onSave }) {
             <input
               type="datetime-local"
               name="start"
-              value={eventDetails.start}
+              value={event.start}
               onChange={handleChange}
               required
             />
@@ -176,7 +172,7 @@ function EventModal({ isOpen, onClose, onSave }) {
             <input
               type="datetime-local"
               name="end"
-              value={eventDetails.end}
+              value={event.end}
               onChange={handleChange}
               required
             />
@@ -186,17 +182,17 @@ function EventModal({ isOpen, onClose, onSave }) {
             <input
               type="text"
               name="location"
-              value={eventDetails.location}
+              value={event.location}
               onChange={handleChange}
               required
             />
           </label>
           <label>
-            Acts Needed:
+            No. of Acts Needed:
             <input
               type="text"
               name="actsneeded"
-              value={eventDetails.actsneeded}
+              value={event.actsneeded}
               onChange={handleChange}
               required
             />
@@ -205,7 +201,7 @@ function EventModal({ isOpen, onClose, onSave }) {
             Description:
             <textarea
               name="description"
-              value={eventDetails.description}
+              value={event.description}
               onChange={handleChange}
               required
             />
@@ -215,20 +211,28 @@ function EventModal({ isOpen, onClose, onSave }) {
             <input
               type="number"
               name="capacity"
-              value={eventDetails.capacity}
+              value={event.capacity}
               onChange={handleChange}
               required
             />
           </label>
           <label>
-            Photo:
+            Contact Email:
+            <textarea
+              name="email"
+              value={event.email}
+              onChange={handleChange}
+              required
+            />
+          </label>
+          <label>
+            Event Flyer:
             <input type="file" name="photo" onChange={handleChange} />
           </label>
-          <button type="submit" disabled={loading}>
+          <button type="submit" disabled={loading} className="button">
             Save Event
           </button>
         </form>
-        <button onClick={onClose}>Cancel</button>
       </div>
     </div>
   );

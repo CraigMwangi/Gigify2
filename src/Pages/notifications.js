@@ -8,6 +8,8 @@ import {
 } from "firebase/firestore";
 import { firestore } from "../components/firebase/firebaseConfig";
 
+// Function to handle new follower events
+
 function Notifications({ currentUser }) {
   const [notifications, setNotifications] = useState([]);
   const [newFollow, setNewFollow] = useState(false); // Track new follow notification

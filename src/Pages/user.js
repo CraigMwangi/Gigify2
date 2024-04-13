@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   doc,
@@ -13,22 +13,21 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { firestore } from "../components/firebase/firebaseConfig";
-import { useAuth } from "../components/firebase/AuthContext.js";
+import { useAuth } from "../components/firebase/AuthContext";
 import { Calendar, momentLocalizer } from "react-big-calendar";
 import moment from "moment";
 import { gapi } from "gapi-script";
 import "react-big-calendar/lib/css/react-big-calendar.css";
-import Modal from "./modal.js";
-import EmailModal from "./emailModal.js";
-import emailjs from "./emailModal.js";
-import ProfilePage from "./profile.js";
+import MapModal from "./mapModal";
+import Notifications from "./notifications";
 
 const localizer = momentLocalizer(moment);
 
-function User() {
+function UserPage() {
+  // Hooks for various states
   const { currentUser } = useAuth();
-  const { uid } = useParams(); // Get uid from route parameters
   const navigate = useNavigate();
+  const { uid } = useParams();
   const [events, setEvents] = useState([]);
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -38,10 +37,26 @@ function User() {
   const [followingUsers, setFollowingUsers] = useState([]);
   const [followersUsers, setFollowersUsers] = useState([]);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [userCategory, setUserCategory] = useState("");
+  const [showFollowersModal, setShowFollowersModal] = useState(false);
+  const [showFollowingModal, setShowFollowingModal] = useState(false);
+
+  const galleryRef = useRef(null);
+  const [isImageModalOpen, setImageModalOpen] = useState(false);
+  const [currentMedia, setCurrentMedia] = useState(null);
+
+  const openImageModal = (media) => {
+    setCurrentMedia(media);
+    setImageModalOpen(true);
+  };
+
+  const closeImageModal = () => {
+    setImageModalOpen(false);
+  };
 
   useEffect(() => {
-    // Load Google API on component mount
-    function loadGoogleApi() {
+    async function loadGoogleApi() {
       const script = document.createElement("script");
       script.src = "https://apis.google.com/js/api.js";
       script.onload = () => {
@@ -50,28 +65,26 @@ function User() {
       document.body.appendChild(script);
     }
 
-    // Initialize Google API client
     function initClient() {
       gapi.load("client:auth2", () => {
         if (!gapi.auth2.getAuthInstance()) {
           gapi.auth2
             .init({
-              apiKey: "AIzaSyDfNCiZBEE0pxF-7O8Tb7U7HWSPefje50Q",
-              clientId:
-                "556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com",
+              apiKey: process.env.REACT_APP_GOOGLE_API_KEY,
+              clientId: process.env.REACT_APP_GOOGLE_CLIENT_ID,
               discoveryDocs: [
                 "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest",
               ],
               scope: "https://www.googleapis.com/auth/calendar.events",
             })
             .then(() => {
-              fetchGoogleCalendarEvents(); // Make sure this is called after successful initialization
+              fetchGoogleCalendarEvents();
             })
             .catch((err) => {
               console.error("Error initializing Google API client: ", err);
             });
         } else {
-          fetchGoogleCalendarEvents(); // Call directly if already initialized
+          fetchGoogleCalendarEvents();
         }
       });
     }
@@ -79,98 +92,57 @@ function User() {
     loadGoogleApi();
   }, []);
 
-  // Function to fetch Google Calendar events
   const fetchGoogleCalendarEvents = () => {
-    if (gapi.client && gapi.client.calendar) {
-      gapi.client.calendar.events
-        .list({
-          calendarId: "primary",
-          timeMin: new Date().toISOString(),
-          showDeleted: false,
-          singleEvents: true,
-          maxResults: 10,
-          orderBy: "startTime",
-        })
-        .then((response) => {
-          const items = response.result.items;
-          console.log("Fetched Google Calendar Events:", items); // Debugging line
-          const filteredItems = items.filter(
-            (item) => item.summary && item.summary.startsWith("[AppEvent]")
-          );
-          const formattedEvents = filteredItems.map((event) => ({
-            id: event.id,
-            title: event.summary,
-            start: new Date(event.start.dateTime || event.start.date),
-            end: new Date(event.end.dateTime || event.end.date),
-            description: event.description || "",
-            location: event.location || "Location not provided",
-            isCancelled: event.status === "cancelled",
-          }));
-          console.log(
-            "Formatted Events for React Big Calendar:",
-            formattedEvents
-          ); // Debugging line
-          setEvents(formattedEvents);
-        })
-        .catch((error) => {
-          console.error("Error fetching Google Calendar events: ", error);
-          setError("Failed to fetch Google Calendar events.");
-        });
+    if (uid == currentUser.uid) {
+      if (gapi.client && gapi.client.calendar) {
+        gapi.client.calendar.events
+          .list({
+            calendarId: "primary",
+            timeMin: new Date().toISOString(),
+            showDeleted: false,
+            singleEvents: true,
+            maxResults: 10,
+            orderBy: "startTime",
+          })
+          .then((response) => {
+            const items = response.result.items;
+            const formattedEvents = items.map((event) => ({
+              id: event.id,
+              title: event.summary,
+              start: new Date(event.start.dateTime || event.start.date),
+              end: new Date(event.end.dateTime || event.end.date),
+              description: event.description || "",
+              location: event.location || "Location not provided",
+              isCancelled: event.status === "cancelled",
+            }));
+            setEvents(formattedEvents);
+          })
+          .catch((error) => {
+            console.error("Error fetching Google Calendar events: ", error);
+            setError("Failed to fetch Google Calendar events.");
+          });
+      } else {
+        console.log(
+          "Google API client is not initialized or no user is currently logged in"
+        );
+      }
     } else {
-      console.log("Google API client is not initialized");
+      setEvents([]); // Clears any existing events from the state
     }
   };
 
-  const findLatestUpcomingEvent = () => {
-    const now = new Date();
-    const upcomingEvents = events.filter(
-      (event) => new Date(event.start) > now
-    );
-    upcomingEvents.sort((a, b) => new Date(a.start) - new Date(b.start)); // Sort events by start time
-    return upcomingEvents[0]; // Return the most immediate upcoming event
-  };
-
-  // UseEffect to update the selected event whenever events state changes
-  useEffect(() => {
-    const latestEvent = findLatestUpcomingEvent();
-    setSelectedEvent(latestEvent);
-  }, [events]);
-
-  const renderLatestEvent = () => {
-    if (selectedEvent) {
-      return (
-        <div
-          onClick={() => setIsModalOpen(true)}
-          style={{
-            cursor: "pointer",
-            marginBottom: "20px",
-            padding: "10px",
-            border: "1px solid #ccc",
-            borderRadius: "5px",
-          }}
-        >
-          <h3>Next Upcoming Event: {selectedEvent.title}</h3>
-          <p>Start: {selectedEvent.start.toLocaleString()}</p>
-          <p>End: {selectedEvent.end.toLocaleString()}</p>
-          {/* Add more details as needed */}
-        </div>
-      );
-    }
-    return <p>No upcoming [AppEvent] events.</p>;
-  };
-
+  // Fetching user data
   useEffect(() => {
     const fetchData = async () => {
       if (!uid) {
         setLoading(false);
-        setError("Please Sign In.");
+        setError("User ID not provided.");
         return;
       }
 
       setLoading(true);
 
       try {
-        // Fetch user data
         const docRef = doc(firestore, "users", uid);
         const docSnap = await getDoc(docRef);
 
@@ -182,20 +154,18 @@ function User() {
 
         const userData = docSnap.data();
 
-        // Fetch gallery items
         const galleryRef = collection(firestore, "galleryItems");
         const q = query(galleryRef, where("uid", "==", uid));
         const querySnapshot = await getDocs(q);
         const galleryItems = querySnapshot.docs.map((doc) => doc.data());
 
-        // Fetch availability data
         const availabilityRef = doc(firestore, "userAvailability", uid);
         const availabilitySnap = await getDoc(availabilityRef);
         const availabilityData = availabilitySnap.exists()
           ? availabilitySnap.data()
           : {};
 
-        // Update state with both user data and gallery items
+        setUserCategory(docSnap.data().category);
         setProfileData({
           ...userData,
           gallery: galleryItems,
@@ -211,44 +181,17 @@ function User() {
     fetchData();
   }, [uid]);
 
-  // ...
-
-  const fetchProfileAndAvailability = async () => {
-    setLoading(true);
-    try {
-      // Fetch availability data for the user being viewed
-      const availabilityRef = doc(firestore, "userAvailability", uid);
-      const availabilitySnap = await getDoc(availabilityRef);
-
-      if (availabilitySnap.exists()) {
-        const data = availabilitySnap.data();
-        const loadedEvents =
-          data.availabilityDates?.map((event) => ({
-            title: event.title || "Available",
-            start: event.start ? new Date(event.start.seconds * 1000) : null,
-            end: event.end ? new Date(event.end.seconds * 1000) : null,
-            description: event.description || "",
-          })) || [];
-        setEvents(loadedEvents);
-      } else {
-        setError("Availability data not found.");
-      }
-    } catch (err) {
-      console.error("Error fetching user availability:", err);
-      setError("Failed to fetch user availability.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Fetching follower and following user details
   useEffect(() => {
-    checkIsFollowing();
-    fetchFollowers();
-    fetchFollowing();
+    if (uid && currentUser) {
+      checkIsFollowing();
+      fetchFollowers();
+      fetchFollowing();
+    }
   }, [uid, currentUser]);
 
+  // Checking if the current user is following the viewed user
   const checkIsFollowing = () => {
-    // Query to check if the current user is following the viewed user
     const q = query(
       collection(firestore, "Follows"),
       where("followerId", "==", currentUser.uid),
@@ -260,6 +203,7 @@ function User() {
     return () => unsubscribe();
   };
 
+  // Fetching followers
   const fetchFollowers = async () => {
     const followersQuery = query(
       collection(firestore, "Follows"),
@@ -270,13 +214,14 @@ function User() {
 
     const userPromises = followerIds.map(async (id) => {
       const userDoc = await getDoc(doc(firestore, "users", id));
-      return { id: userDoc.id, ...userDoc.data() }; // Adjust according to your user document structure
+      return { id: userDoc.id, ...userDoc.data() };
     });
 
     const usersDetails = await Promise.all(userPromises);
     setFollowersUsers(usersDetails);
   };
 
+  // Fetching users followed by the viewed user
   const fetchFollowing = async () => {
     const followingQuery = query(
       collection(firestore, "Follows"),
@@ -289,7 +234,7 @@ function User() {
 
     const userPromises = followingIds.map(async (id) => {
       const userDoc = await getDoc(doc(firestore, "users", id));
-      return { id: userDoc.id, ...userDoc.data() }; // Assuming you have name or username in the user document
+      return { id: userDoc.id, ...userDoc.data() };
     });
 
     const usersDetails = await Promise.all(userPromises);
@@ -297,113 +242,210 @@ function User() {
   };
 
   const handleFollow = async () => {
-    if (!isFollowing) {
-      // Add follow relationship
-      await addDoc(collection(firestore, "Follows"), {
-        followerId: currentUser.uid,
-        followingId: uid,
-      });
-      // Send notification
-      await addDoc(collection(firestore, "Notifications"), {
-        receiverId: uid,
-        senderId: currentUser.uid,
-        message: `${currentUser.displayName} is now following you.`,
-        timestamp: new Date(),
-        read: false,
-      });
-      setIsFollowing(true);
-    } else {
-      // Unfollow
-      const q = query(
-        collection(firestore, "Follows"),
-        where("followerId", "==", currentUser.uid),
-        where("followingId", "==", uid)
-      );
-      const snapshot = await getDocs(q);
-      snapshot.forEach((doc) => {
-        deleteDoc(doc.ref);
-      });
-      setIsFollowing(false);
+    try {
+      if (!isFollowing) {
+        // Follow the user
+        const followDocRef = await addDoc(collection(firestore, "Follows"), {
+          followerId: currentUser.uid,
+          followingId: uid,
+        });
+        console.log("Follow successful with document ID:", followDocRef.id);
+        setIsFollowing(true); // Update state to reflect following status
+      } else {
+        // Unfollow the user
+        const q = query(
+          collection(firestore, "Follows"),
+          where("followerId", "==", currentUser.uid),
+          where("followingId", "==", uid)
+        );
+        const snapshot = await getDocs(q);
+        snapshot.forEach((doc) => {
+          deleteDoc(doc.ref);
+        });
+        console.log("Unfollow successful");
+        setIsFollowing(false); // Update state to reflect not following
+      }
+    } catch (error) {
+      console.error("Error updating follow status:", error);
     }
   };
 
-  const redirectToUserProfile = (userId) => {
-    navigate(`/user/${userId}`);
-  };
-
+  // Handling UI rendering based on loading and error states
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;
-
-  const handleContactEmail = () => {
-    window.location.href = `mailto:${profileData?.email}`;
-  };
-
-  const handleEditProfileClick = () => {
-    navigate(`/edit-profile/${uid}`);
-  };
 
   const handleSelectEvent = (event) => {
     setSelectedEvent(event);
     setIsModalOpen(true);
   };
 
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  const handleOpenGoogleCalendar = () => {
+    window.open("https://calendar.google.com/");
+  };
 
-  if (error) {
-    return <div>Error: {error}</div>;
-  }
+  // Modal for listing followers or following users
+  const ListModal = ({ isOpen, onClose, title, list }) => {
+    if (!isOpen) return null;
+
+    return (
+      <div className="modal-backdrop" onClick={onClose}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <h2 className="modal-header">{title}</h2>
+          {list.length > 0 ? (
+            <ul className="modal-list">
+              {list.map((user) => (
+                <li
+                  key={user.id}
+                  className="click-follow"
+                  onClick={() => {
+                    navigate(`/user/${user.id}`);
+                    onClose(); // Close modal when a user is selected
+                  }}
+                >
+                  {user.name || user.username || "Unnamed User"}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="modal-empty-message">
+              {title === "Followers"
+                ? "User has no followers."
+                : "User is not following anyone."}
+            </p>
+          )}
+          <button className="button" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="account-page">
-      <button onClick={handleFollow}>
-        {isFollowing ? "Unfollow" : "Follow"}
-      </button>
-      <h2>Following</h2>
-      <ul>
-        {followingUsers.map((user) => (
-          <li
-            key={user.id}
-            onClick={() => redirectToUserProfile(user.id)}
-            style={{ cursor: "pointer" }}
-          >
-            {user.name || user.username || "Unnamed User"}
-          </li>
-        ))}
-      </ul>
-
-      <h2>Followers</h2>
-      <ul>
-        {followersUsers.map((user) => (
-          <li
-            key={user.id}
-            onClick={() => redirectToUserProfile(user.id)}
-            style={{ cursor: "pointer" }}
-          >
-            {user.name || user.username || "Unnamed User"}
-          </li>
-        ))}
-      </ul>
-      <h2>{profileData?.username}</h2>
-      <h3>{profileData?.category}</h3>
-      <p>{profileData?.Role}</p>
-      {profileData?.profilePicture && (
-        <img
-          src={profileData.profilePictureUrl}
-          alt="Profile"
-          style={{ maxWidth: "100px", maxHeight: "100px" }}
-        />
-      )}
-      <div>Email: {profileData?.email}</div>
-      <div>Full Name: {profileData?.fullName}</div>
-      <div>Birthday: {profileData?.birthday}</div>
-      <div>Category: {profileData?.category}</div>
-      <div>Genre: {profileData?.genre}</div>
-      <div>Location: {profileData?.location}</div>
-      <div>Bio: {profileData?.bio}</div>
-      <div>Instagram: {profileData?.instagram}</div>
+    <div className="container">
+      <div className="notifications">
+        <Notifications currentUser={currentUser} />
+      </div>
+      <div className="profile-details">
+        <h2>{profileData?.username}</h2>
+        <h4>{profileData?.category}</h4>
+        <p>{profileData?.Role}</p>
+      </div>
+      <div className="follow-info">
+        <div
+          style={{
+            cursor: "pointer",
+            textDecoration: "underline",
+          }}
+          onClick={() => setShowFollowersModal(true)}
+        >
+          Followers: {followersUsers.length}
+        </div>
+        <div
+          style={{
+            cursor: "pointer",
+            textDecoration: "underline",
+          }}
+          onClick={() => setShowFollowingModal(true)}
+        >
+          Following: {followingUsers.length}
+        </div>
+      </div>
       <div>
+        <ListModal
+          isOpen={showFollowersModal}
+          onClose={() => setShowFollowersModal(false)}
+          title="Followers"
+          list={followersUsers}
+        />
+        <ListModal
+          isOpen={showFollowingModal}
+          onClose={() => setShowFollowingModal(false)}
+          title="Following"
+          list={followingUsers}
+        />
+      </div>
+      <div className="profile-picture-container">
+        {profileData?.profilePicture && (
+          <img
+            src={profileData.profilePictureUrl}
+            alt="Profile"
+            className="profile-picture"
+          />
+        )}
+      </div>
+      <button onClick={handleFollow} className="button">
+        {isFollowing ? "Following" : "+ Follow"}
+      </button>
+      <div className="account-details">
+        <h3>{profileData?.username} Top Video</h3>
+        <div className="embed-container">
+          {profileData.youtubeEmbedUrl && (
+            <iframe
+              width="560"
+              height="315"
+              src={profileData.youtubeEmbedUrl}
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="youtube-embed"
+            ></iframe>
+          )}
+        </div>
+      </div>
+      <div className="account-details">
+        <h3>{profileData?.username} Top Tracks</h3>
+        <div className="embed-container">
+          {profileData.spotifyEmbedUrl && (
+            <iframe
+              src={profileData.spotifyEmbedUrl}
+              width="300"
+              height="380"
+              frameBorder="0"
+              allowTransparency="true"
+              allow="encrypted-media"
+              className="spotify-embed"
+            ></iframe>
+          )}
+        </div>
+      </div>
+      <div className="account-details">
+        <div className="input-with-info">
+          Contact Email:
+          {profileData?.email ? (
+            <a
+              href={`mailto:${profileData.email}`}
+              style={{ marginLeft: "5px" }}
+            >
+              {profileData.email}
+            </a>
+          ) : (
+            <span style={{ marginLeft: "5px" }}>Not Available</span>
+          )}
+          <span
+            className="info-icon"
+            data-tooltip="Click the user's email to send a direct email."
+          >
+            i
+          </span>
+        </div>
+      </div>
+      <div className="account-details">Full Name: {profileData?.fullName}</div>
+      <div className="account-details">Birthday: {profileData?.birthday}</div>
+      <div className="account-details">Genre: {profileData?.genre}</div>
+      <div className="account-details">Location: {profileData?.location}</div>
+      <div className="account-details">Bio: {profileData?.bio}</div>
+      <div className="account-details">
+        Instagram:{" "}
+        <a
+          href={profileData?.instagram}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Instagram
+        </a>
+      </div>
+      <div className="account-details">
         Spotify:{" "}
         <a
           href={profileData?.spotify}
@@ -413,13 +455,13 @@ function User() {
           Spotify
         </a>
       </div>
-      <div>
+      <div className="account-details">
         TikTok:{" "}
         <a href={profileData?.tiktok} target="_blank" rel="noopener noreferrer">
           TikTok
         </a>
       </div>
-      <div>
+      <div className="account-details">
         YouTube:{" "}
         <a
           href={profileData?.youtube}
@@ -429,67 +471,134 @@ function User() {
           YouTube
         </a>
       </div>
-      <div>
-        <h2>Availability</h2>
-        <Calendar
-          localizer={localizer}
-          events={events}
-          startAccessor="start"
-          endAccessor="end"
-          selectable={false}
-          style={{ height: 400, width: 600 }}
-          onSelectEvent={handleSelectEvent}
-        />
-        <EmailModal
+      <div className="account-details">
+        {profileData && (
+          <>
+            {userCategory === "Venue" && (
+              <>
+                <h3>Venue Details</h3>
+                <p>Preferred Styles: {profileData.preferredStyles || "N/A"}</p>
+                <p>Ambience: {profileData.ambience || "N/A"}</p>
+                <p>Capacity: {profileData.capacity || "N/A"}</p>
+              </>
+            )}
+
+            {userCategory === "Musician" && (
+              <>
+                <h3>Musician Details:</h3>
+                <p>
+                  Performance Style: {profileData.performanceStyle || "N/A"}
+                </p>
+                <p>Preferred Venues: {profileData.preferredVenues || "N/A"}</p>
+                <p>Disabilities: {profileData.disabilities || "N/A"}</p>
+                <p>
+                  {" "}
+                  Max Travel Distance:{" "}
+                  {profileData?.availability?.maxTravelDistance} miles
+                </p>
+              </>
+            )}
+          </>
+        )}
+      </div>
+      <div className="account-performance-dates">
+        <div className="input-with-info">
+          <h2>Performance Dates</h2>
+          <span
+            className="info-icon"
+            data-tooltip="View when this user is performing."
+          >
+            i
+          </span>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            margin: "20px 0",
+            width: "100%",
+          }}
+        >
+          <Calendar
+            localizer={localizer}
+            events={events}
+            startAccessor="start"
+            endAccessor="end"
+            selectable={true}
+            style={{
+              height: 400,
+              width: "100%",
+              backgroundColor: "rgb(131, 131, 131)",
+            }}
+            onSelectEvent={handleSelectEvent}
+          />
+        </div>
+        <MapModal
           event={selectedEvent}
           isOpen={isModalOpen}
           onClose={() => {
             setIsModalOpen(false);
-            setSelectedEvent(null); // Reset selected event when closing the modal
+            setSelectedEvent(null);
           }}
-          recipientEmail={profileData?.email} // Assuming this is the email of the user to contact
+          recipientEmail={profileData?.email}
           location={selectedEvent?.location}
           profileData={profileData}
         />
-        {renderLatestEvent()}
-        <div>
-          Max Travel Distance: {profileData?.availability?.maxTravelDistance}{" "}
-          miles
-        </div>
-        <div>
-          Performance Style: {profileData?.availability?.performanceStyle}
-        </div>
-        <div>
-          Preferred Venues: {profileData?.availability?.preferredVenues}
-        </div>
-        <div>
-          Disabilities: {profileData?.availability?.disabilities || "N/A"}
-        </div>
-        {/* Existing gallery display */}
       </div>
-      <h2>Gallery</h2>
-      <div className="gallery">
-        {profileData?.gallery?.map((item, index) => (
-          <div key={index} className="gallery-item">
-            {item.type === "photo" ? (
-              <img
-                src={item.url}
-                alt="Gallery Item"
-                style={{ maxWidth: "100px", maxHeight: "100px" }}
-              />
-            ) : (
-              <video width="320" height="240" controls>
-                <source src={item.url} type="video/mp4" />
-                Your browser does not support the video tag.
-              </video>
-            )}
-          </div>
-        ))}
-        <div>
-          <button>View Gallery</button>
+      <button onClick={handleOpenGoogleCalendar} className="button">
+        Open My Google Calendar
+      </button>
+      <div className="gallery-container">
+        <h2>Gallery</h2>
+        <div className="account-gallery" ref={galleryRef}>
+          {profileData?.gallery?.map((item, index) => (
+            <div
+              key={index}
+              className="account-gallery-item"
+              onClick={() => openImageModal(item)}
+            >
+              {item.type === "photo" ? (
+                <img src={item.url} alt="Gallery Item" />
+              ) : (
+                <video controls>
+                  <source src={item.url} type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
+              )}
+            </div>
+          ))}
         </div>
+        {isImageModalOpen && (
+          <div className="gallery-modal-overlay" onClick={closeImageModal}>
+            <div
+              className="gallery-modal-content"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {currentMedia.type === "photo" ? (
+                <img
+                  src={currentMedia.url}
+                  alt="Full Size"
+                  style={{ maxWidth: "100%", maxHeight: "80vh" }}
+                />
+              ) : (
+                <video
+                  controls
+                  autoPlay
+                  style={{ maxWidth: "100%", maxHeight: "80vh" }}
+                >
+                  <source src={currentMedia.url} type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
+              )}
+              <button className="close-button" onClick={closeImageModal}>
+                X
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
-export default User;
+
+export default UserPage;

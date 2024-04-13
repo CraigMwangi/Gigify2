@@ -8,21 +8,32 @@ import {
   Timestamp,
   query,
   where,
+  doc,
+  getDoc,
+  orderBy,
 } from "firebase/firestore";
 import { firestore } from "../components/firebase/firebaseConfig";
 import { useAuth } from "../components/firebase/AuthContext";
 import EventModal from "./eventModal";
 import EmailModal from "./emailModal";
+import emailjs from "emailjs-com";
 
 const EventsPage = () => {
   const { currentUser } = useAuth();
+  const [userProfileData, setUserProfileData] = useState({});
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [notification, setNotification] = useState({
+    show: false,
+    message: "",
+    type: "", // Can be "success" or "error"
+  });
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [filters, setFilters] = useState({
+    eventname: "",
     location: "",
     genre: "",
     date: "",
@@ -32,12 +43,12 @@ const EventsPage = () => {
   const [filteredEvents, setFilteredEvents] = useState([]);
   const resetFilters = () => {
     setFilters({
+      name: "",
       location: "",
       genre: "",
       date: "",
       capacity: "",
     });
-    // Optionally reset filtered events to show all events again
     setFilteredEvents(events);
   };
   const createNotification = async (eventId, creatorId) => {
@@ -56,11 +67,34 @@ const EventsPage = () => {
     }
   };
 
+  const [userDetails, setUserDetails] = useState();
+
   const navigate = useNavigate();
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters({ ...filters, [name]: value });
+  };
+
+  // Notification feature to inform user of successful or failed message send
+
+  const Notification = ({ type, message }) => {
+    if (!message) return null;
+
+    const notificationStyle = {
+      position: "fixed",
+      top: "10px",
+      right: "10px",
+      border: "1px solid",
+      borderColor: type === "success" ? "green" : "red",
+      backgroundColor: type === "success" ? "#d4edda" : "#f8d7da",
+      color: type === "success" ? "#155724" : "#721c24",
+      padding: "10px",
+      borderRadius: "5px",
+      zIndex: 1000,
+    };
+
+    return <div style={notificationStyle}>{message}</div>;
   };
 
   const addToFavorites = async (event) => {
@@ -100,22 +134,50 @@ const EventsPage = () => {
     }
   };
 
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (currentUser?.uid) {
+        const docRef = doc(firestore, "users", currentUser.uid);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          setUserProfileData(docSnap.data());
+        } else {
+          console.log("No such document!");
+        }
+      }
+    };
+
+    fetchUserProfile();
+  }, [currentUser]);
   // Function to apply filters
   const applyFilters = () => {
     setFilteredEvents(
       events.filter((event) => {
         return (
-          (!filters.location || event.location.includes(filters.location)) &&
-          (!filters.genre || event.genre === filters.genre) &&
+          (!filters.name || event.title === filters.name) && // Check if the name filter is empty or matches
+          (!filters.location || event.location.includes(filters.location)) && // Check if the location filter is empty or matches
+          (!filters.genre || event.genre === filters.genre) && // Check if the genre filter is empty or matches
           (!filters.date ||
             new Date(event.start).toDateString() ===
-              new Date(filters.date).toDateString()) &&
-          (!filters.capacity || event.capacity >= filters.capacity)
+              new Date(filters.date).toDateString()) && // Check if the date filter is empty or matches
+          (!filters.capacity || event.capacity >= filters.capacity) // Check if the capacity filter is empty or matches
         );
-        // Implement time filter as needed
       })
     );
   };
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && events.length > 0) {
+      // Scroll that runs after events have been loaded
+      const eventId = hash.substring(1);
+      const eventElement = document.getElementById(eventId);
+      if (eventElement) {
+        eventElement.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  }, [events]); // Add events as a dependency
 
   useEffect(() => {
     if (!currentUser) {
@@ -126,6 +188,8 @@ const EventsPage = () => {
 
     loadGoogleApi();
   }, [currentUser]);
+
+  // Google Api to allow users to add to Google Calendar
 
   const loadGoogleApi = () => {
     const script = document.createElement("script");
@@ -139,7 +203,6 @@ const EventsPage = () => {
   const initClient = () => {
     gapi.client
       .init({
-        apiKey: "AIzaSyDfNCiZBEE0pxF-7O8Tb7U7HWSPefje50Q",
         clientId:
           "556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com",
         discoveryDocs: [
@@ -160,26 +223,16 @@ const EventsPage = () => {
     setLoading(true);
     try {
       // Initialize empty arrays for both event sources
-      let googleCalendarEvents = [];
       let firestoreEvents = [];
-
-      // Attempt to fetch events from both sources
-      try {
-        googleCalendarEvents = await fetchGoogleCalendarEvents();
-      } catch (googleError) {
-        console.error("Error fetching Google Calendar events:", googleError);
-        // Optionally set an error state or log this error
-      }
 
       try {
         firestoreEvents = await fetchFirestoreEvents();
       } catch (firestoreError) {
         console.error("Error fetching Firestore events:", firestoreError);
-        // Optionally set an error state or log this error
       }
 
-      // Combine both arrays, ensuring that even if one fails, the other's events are still set
-      setEvents([...googleCalendarEvents, ...firestoreEvents]);
+      // Combines both arrays, ensuring that even if one fails, the other's events are still set
+      setEvents([...firestoreEvents]);
     } catch (error) {
       console.error("Error fetching events:", error);
       setError(error.message);
@@ -188,43 +241,17 @@ const EventsPage = () => {
     }
   };
 
-  const fetchGoogleCalendarEvents = async () => {
-    try {
-      const response = await gapi.client.calendar.events.list({
-        calendarId: "primary",
-        timeMin: new Date().toISOString(),
-        showDeleted: false,
-        singleEvents: true,
-        maxResults: 10,
-        orderBy: "startTime",
-      });
-
-      const items = response.result.items;
-      // Filter events based on the custom identifier in the description
-      const filteredItems = items.filter(
-        (item) => item.summary && item.summary.startsWith("[AppEvent]")
-      );
-      // Alternatively, if using extended properties:
-      // const filteredItems = items.filter(item => item.extendedProperties && item.extendedProperties.private.appIdentifier === "YourAppIdentifier");
-
-      return filteredItems.map((event) => ({
-        id: event.id,
-        title: event.summary,
-        start: new Date(event.start.dateTime || event.start.date),
-        end: new Date(event.end.dateTime || event.end.date),
-        description: event.description || "",
-        location: event.location || "Location not provided",
-      }));
-    } catch (error) {
-      console.error("Error fetching Google Calendar events:", error);
-      throw new Error("Failed to fetch Google Calendar events.");
-    }
-  };
-
   const fetchFirestoreEvents = async () => {
     try {
-      const querySnapshot = await getDocs(collection(firestore, "events"));
-      return querySnapshot.docs.map((doc) => {
+      const now = new Date();
+      const eventsRef = collection(firestore, "events");
+      const q = query(
+        eventsRef,
+        where("end", ">", Timestamp.fromDate(now)),
+        orderBy("end", "asc")
+      );
+      const querySnapshot = await getDocs(q);
+      const eventsArray = querySnapshot.docs.map((doc) => {
         const data = doc.data();
         return {
           id: doc.id,
@@ -240,12 +267,18 @@ const EventsPage = () => {
             data.end instanceof Timestamp
               ? data.end.toDate()
               : new Date(data.end),
-          username: data.username, // Include username
+          username: data.username,
           uid: data.uid,
           email: data.email,
-          photoURL: data.photoURL, // Include uid for navigation to profile
+          photoURL: data.photoURL,
+          capacity: data.capacity,
         };
       });
+
+      // Sort by the start date after fetching
+      eventsArray.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+      return eventsArray;
     } catch (error) {
       console.error("Error fetching Firestore events:", error);
       throw new Error("Failed to fetch Firestore events.");
@@ -274,96 +307,13 @@ const EventsPage = () => {
     }
   };
 
-  const handleSeeEvent = (eventId) => {
-    navigate(`/event/${eventId}`); // Navigate to the event details page
-  };
-
-  const saveEventToFirestore = async (eventDetails) => {
-    setLoading(true);
-    try {
-      // Query Firestore for an event with matching details
-      const eventsRef = collection(firestore, "events");
-      const q = query(
-        eventsRef,
-        where("title", "==", eventDetails.title),
-        where("start", "==", eventDetails.start),
-        where("end", "==", eventDetails.end)
-      );
-
-      const querySnapshot = await getDocs(q);
-
-      // Proceed to add the event to Firestore only if it doesn't already exist
-      if (querySnapshot.empty) {
-        await addDoc(eventsRef, eventDetails);
-        alert("Event saved successfully");
-      } else {
-        alert("This event already exists in your events.");
-      }
-    } catch (err) {
-      console.error("Error saving event to Firestore:", err);
-      setError("Failed to save event.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const saveEventToGoogleCalendar = async (eventDetails) => {
-    const event = {
-      summary: eventDetails.title,
-      location: eventDetails.location,
-      description: eventDetails.description,
-      start: {
-        dateTime: new Date(eventDetails.start).toISOString(),
-        timeZone: "Europe/London", // Adjusted for UK timezone
-      },
-      end: {
-        dateTime: new Date(eventDetails.start).toISOString(),
-        timeZone: "Europe/London", // Adjusted for UK timezone
-      },
-    };
-
-    if (gapi.client && gapi.client.calendar) {
-      gapi.client.calendar.events
-        .insert({
-          calendarId: "primary",
-          resource: event,
-        })
-        .then((response) => {
-          // Handle response here - e.g., updating state or showing a message to the user
-          console.log("Event created: ", response);
-        })
-        .catch((error) => {
-          console.error("Error creating Google Calendar event: ", error);
-        });
-    }
-  };
-
-  const handleCreateNewEvent = async (eventDetails) => {
-    setLoading(true);
-    try {
-      // Assuming saveEventToFirestore and saveEventToGoogleCalendar
-      // are async functions that return a promise
-      await saveEventToFirestore(eventDetails);
-      await saveEventToGoogleCalendar(eventDetails);
-
-      // Call fetchEvents to refresh the list of events displayed
-      await fetchEvents(); // Ensure fetchEvents is defined and callable
-
-      alert("Event saved successfully");
-    } catch (error) {
-      console.error("Error creating new event: ", error);
-      setError("Failed to create new event.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleRefreshEvents = async () => {
-    // Logic to fetch the latest events from Firestore/Google Calendar
-    // and update the state
     try {
-      const updatedEvents = await fetchEvents(); // Assuming fetchEvents is your function to fetch events
-      setEvents(updatedEvents); // Assuming you have a useState hook managing events
+      const updatedEvents = await fetchEvents(); // Fetch the latest events
+      if (updatedEvents && Array.isArray(updatedEvents)) {
+        setEvents(updatedEvents);
+        setFilteredEvents(updatedEvents); // Ensure filtered events are updated simultaneously
+      }
     } catch (error) {
       console.error("Failed to refresh events:", error);
     }
@@ -371,13 +321,12 @@ const EventsPage = () => {
 
   const handleAddToGoogleCalendar = async (event, eventId) => {
     // Construct the URL for the event details page using the event's ID
-    // Assuming your application's domain and routing are correctly set up
-    const eventDetailsUrl = `http://localhost:3000/event/${eventId}`; // Use 'https' in production
+    const eventDetailsUrl = `http://localhost:3000/event/${eventId}`; // URL to link to event on website from Google Calendar
+    const eventTitleWithPrefix = `[AppEvent]${event.title}`; // Tagging the event with the idenifier
 
     // Define the event object for Google Calendar
-    // Include the URL in the description for direct navigation
     const googleEvent = {
-      summary: `[AppEvent] ${event.title}`,
+      summary: eventTitleWithPrefix,
       location: event.location,
       description: `${event.description}\n\nView Event at: ${eventDetailsUrl}`,
       start: {
@@ -394,7 +343,6 @@ const EventsPage = () => {
           genre: event.genre, // Store the genre in extendedProperties
         },
       },
-      // Google Calendar Event's 'description' field is used to include the URL
     };
 
     // Add to Google Calendar using the API
@@ -410,79 +358,168 @@ const EventsPage = () => {
     }
   };
 
-  const handleSaveToUserAvailability = async (event) => {
-    // Define the event object to save, excluding undefined fields
-    const firestoreEvent = {
-      title: event.title,
-      start: event.start,
-      end: event.end,
-      description: event.description,
-      location: event.location,
+  // Function to accept event
+  const acceptEvent = async (event) => {
+    if (!currentUser) {
+      alert("Please log in to accept events.");
+      return;
+    }
+
+    // Update Firestore with acceptance details
+    const acceptancesRef = collection(firestore, "eventAcceptances");
+    const acceptance = {
+      eventId: event.id,
+      userId: currentUser.uid,
+      acceptedAt: Timestamp.now(),
     };
 
-    // Only add the genre field if it's defined
-    if (event.genre) {
-      firestoreEvent.genre = event.genre;
-    }
-
-    // Add to Firestore's userAvailability collection
     try {
-      await addDoc(collection(firestore, "userAvailability"), firestoreEvent);
-      alert("Event saved to your availability");
+      await addDoc(acceptancesRef, acceptance);
+      console.log("Event acceptance recorded");
+      // Inform the user of successful acceptance
     } catch (error) {
-      console.error("Error saving event to Firestore:", error);
-      alert("Failed to save event to your availability");
+      console.error("Error recording event acceptance: ", error);
+      alert("Failed to accept event.");
+      return; // Exit if saving the acceptance fails
     }
+    const eventDetailsUrl = `http://localhost:3000/event/${event.id}`;
+
+    // Send notification email to event creator
+    const emailParams = {
+      to_email: event?.email, // Fetched email from event
+      message: `Your event, ${event.title}, has been accepted by ${
+        currentUser.username || "a user"
+      }. You can contact them at ${currentUser.email}.`,
+      event_title: event?.title || "",
+      event_date: event?.start ? `${event.start.toLocaleDateString()}` : "N/A",
+      event_genre: event?.genre || "",
+      event_time:
+        event?.start && event?.end
+          ? `${event.start.toLocaleTimeString()} - ${event.end.toLocaleTimeString()}`
+          : "N/A",
+      event_description: `${
+        event?.description || ""
+      }\n\nView Event at: ${eventDetailsUrl}`,
+      event_location: event?.location || "N/A",
+      event_username: event?.username,
+      user_username: userProfileData.username,
+      user_email: userProfileData.email,
+    };
+
+    // EmailJS to send the email
+    emailjs
+      .send(
+        "service_hmbss4p",
+        "template_9ygxgck",
+        emailParams,
+        "qPX4lZbgV_2l9XtX7"
+      )
+      .then((result) => {
+        setNotification({
+          show: true,
+          message: "Event successfully accepted!",
+          type: "success",
+        });
+        setTimeout(
+          () => setNotification({ show: false, message: "", type: "" }),
+          5000
+        );
+      })
+      .catch((error) => {
+        setNotification({
+          show: true,
+          message: "Failed to send acceptance email.",
+          type: "error",
+        });
+      });
+  };
+
+  // Adds new event to MyEvents Page
+  const handleNewEventAdded = (newEvent) => {
+    setEvents((prevEvents) => [...prevEvents, newEvent]);
   };
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;
 
   return (
-    <div>
-      <h2>Filter Events</h2>
-      <div>
-        <input
-          type="text"
-          name="location"
-          placeholder="Location"
-          value={filters.location}
-          onChange={handleFilterChange}
-        />
-        <input
-          type="text"
-          name="genre"
-          placeholder="Genre"
-          value={filters.genre}
-          onChange={handleFilterChange}
-        />
-        <input
-          type="date"
-          name="date"
-          placeholder="Date"
-          value={filters.date}
-          onChange={handleFilterChange}
-        />
-        <input
-          type="number"
-          name="capacity"
-          placeholder="Minimum Capacity"
-          value={filters.capacity}
-          onChange={handleFilterChange}
-        />
-        <button onClick={applyFilters}>Apply Filters</button>
-        <button onClick={resetFilters}>Reset Filters</button>
+    <div className="container">
+      {notification.show && (
+        <Notification type={notification.type} message={notification.message} />
+      )}
+      <h2 className="header-text">Filter Events</h2>
+      <p className="centre-text">Use the filters to find upcoming events.</p>
+      <div className="events-filter-content">
+        <div className="input-group">
+          <input
+            type="text"
+            name="eventname"
+            placeholder="Event Name"
+            value={filters.name}
+            onChange={handleFilterChange}
+          />
+          <input
+            type="text"
+            name="location"
+            placeholder="Location"
+            value={filters.location}
+            onChange={handleFilterChange}
+          />
+          <input
+            type="text"
+            name="genre"
+            placeholder="Genre"
+            value={filters.genre}
+            onChange={handleFilterChange}
+          />
+          <input
+            type="date"
+            name="date"
+            placeholder="Date"
+            value={filters.date}
+            onChange={handleFilterChange}
+          />
+          <input
+            type="number"
+            name="capacity"
+            placeholder="Minimum Capacity"
+            value={filters.capacity}
+            onChange={handleFilterChange}
+          />
+        </div>
+        <div className="button-group">
+          <button onClick={applyFilters} className="button">
+            Apply Filters
+          </button>
+          <button onClick={resetFilters} className="button">
+            Reset Filters
+          </button>
+        </div>
       </div>
-      <h2>Upcoming Events</h2>
-      <button onClick={() => setIsModalOpen(true)}>Create New Event</button>
-      <div>
+      <p className="centre-text">
+        Use the 'Create A Night' to create an event.
+      </p>
+      <button onClick={() => setIsEventModalOpen(true)} className="button">
+        Create A Night
+      </button>
+      <h2 className="header-text">Upcoming Events</h2>
+      <div className="event-filter-results">
         <ul>
           {filteredEvents.length > 0 ? (
             filteredEvents.map((event) => (
               // Event list item
-              <li key={event.id}>
+              <li
+                key={event.id}
+                id={event.id}
+                style={{
+                  backgroundColor: "rgb(131, 131, 131)",
+                  padding: "10px",
+                  marginBottom: "10px",
+                  borderRadius: "5px",
+                }}
+              >
                 <h3>{event.title}</h3>
-                <p>{event.genre}</p>
+                <p>Genre: {event.genre}</p>
                 <p>Start: {event.start.toLocaleString()}</p>
                 <p>End: {event.end.toLocaleString()}</p>
                 <p>Description: {event.description}</p>
@@ -498,22 +535,23 @@ const EventsPage = () => {
                 )}
                 <p>
                   Created by:{" "}
-                  <Link
-                    to={`/user/${event.uid}`}
-                    style={{ textDecoration: "underline" }}
-                  >
-                    {event.username}
+                  <Link to={`/user/${event.uid}`}>
+                    Go to {event.username}'s profile
                   </Link>
                 </p>
                 <button
                   onClick={() => {
                     setIsEmailModalOpen(true);
-                    setSelectedEvent(event); // Assuming you have a state to hold the selected event
+                    setSelectedEvent(event);
                   }}
+                  className="button"
                 >
-                  Send a Booking
+                  Send a Message
                 </button>
-                <button onClick={() => handleAddToGoogleCalendar(event)}>
+                <button
+                  onClick={() => handleAddToGoogleCalendar(event)}
+                  className="button"
+                >
                   Add to Google Calendar
                 </button>
               </li>
@@ -525,9 +563,18 @@ const EventsPage = () => {
         {events.length > 0 && (
           <ul>
             {events.map((event) => (
-              <li key={event.id}>
+              <li
+                key={event.id}
+                id={event.id}
+                style={{
+                  backgroundColor: "rgb(131, 131, 131)",
+                  padding: "20px",
+                  marginBottom: "10px",
+                  borderRadius: "5px",
+                }}
+              >
                 <h3>{event.title}</h3>
-                <p>{event.genre}</p>
+                <p>Genre: {event.genre}</p>
                 <p>Start: {event.start.toLocaleString()}</p>
                 <p>End: {event.end.toLocaleString()}</p>
                 <p>Description: {event.description}</p>
@@ -542,26 +589,36 @@ const EventsPage = () => {
                   />
                 )}
                 <p>
-                  Created by:{" "}
-                  <Link
-                    to={`/user/${event.uid}`}
-                    style={{ textDecoration: "underline" }}
-                  >
-                    {event.username}
+                  Created by:
+                  <Link to={`/user/${event.uid}`} className="link-button">
+                    Go to {event.username}'s profile
                   </Link>
                 </p>
+
                 <button
                   onClick={() => {
                     setIsEmailModalOpen(true);
-                    setSelectedEvent(event); // Assuming you have a state to hold the selected event
+                    setSelectedEvent(event);
                   }}
+                  className="button"
                 >
                   Send a Booking
                 </button>
-                <button onClick={() => handleAddToGoogleCalendar(event)}>
+                <button
+                  onClick={() => handleAddToGoogleCalendar(event)}
+                  className="button"
+                >
                   Add to Google Calendar
                 </button>
-                <button onClick={() => addToFavorites(event)}>Favorite</button>
+                <button
+                  onClick={() => addToFavorites(event)}
+                  className="button"
+                >
+                  Favorite
+                </button>
+                <button onClick={() => acceptEvent(event)} className="button">
+                  Accept Event
+                </button>
               </li>
             ))}
           </ul>
@@ -572,11 +629,13 @@ const EventsPage = () => {
         onClose={() => setIsEmailModalOpen(false)}
         event={selectedEvent} // Pass selected event details to the modal
         onSave={handleEmailModalSubmit}
+        setNotification={setNotification}
       />
       <EventModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isEventModalOpen}
+        onClose={() => setIsEventModalOpen(false)}
         onSave={handleRefreshEvents}
+        onEventCreated={handleNewEventAdded}
       />
     </div>
   );

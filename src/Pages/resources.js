@@ -18,14 +18,16 @@ const ResourcesPage = () => {
       imageUrl:
         "https://d1yjjnpx0p53s8.cloudfront.net/styles/logo-thumbnail/s3/092013/bandcamp_0.png?itok=YWz3MeYO",
     },
-    // Add more resources as needed
+    // More Resources will be added in future.
   ]);
 
   return (
-    <div className="resources-page">
-      <h1>Resources for Independent Musicians and Venues</h1>
-      <p>Here at Gigify, we care about grassroots venues and musicians.</p>
-
+    <div className="container">
+      <h1 className="centre-text">Resources for Independent Musicians</h1>
+      <p className="centre-text">
+        Here at Gigify, we care about grassroots musicians. Click the links
+        below to view the resources.
+      </p>
       <div className="resource-list">
         {resources.map((resource, index) => (
           <div key={index} className="resource-item">

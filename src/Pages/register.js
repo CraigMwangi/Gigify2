@@ -14,10 +14,12 @@ import {
 } from "firebase/firestore";
 import { firestore, storage } from "../components/firebase/firebaseConfig";
 import { useAuth } from "../components/firebase/AuthContext";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
-// Asynchronous function to geocode the Location field using Google Geocode API
+// Register Page for New User Sign Up
+// No comments for this page as it functions the same as Edit Profile
+
 async function geocodeAddress(address) {
   const response = await fetch(
     `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
@@ -34,17 +36,14 @@ async function geocodeAddress(address) {
   }
 }
 
-function EditProfilePage() {
+function RegisterPage() {
   const navigate = useNavigate();
-  const { uid } = useParams();
+  const [birthdayError, setBirthdayError] = useState("");
+  const [emailError, setEmailError] = useState("");
   const { currentUser } = useAuth();
-  const [birthdayError, setBirthdayError] = useState(""); // Error if user is underage
-  const [emailError, setEmailError] = useState(""); // Error if users email format is invalid
-  const [userCategory, setUserCategory] = useState(""); // Define if user is musician or venue
-  const [youtubeLink, setYoutubeLink] = useState(""); // Stores users YT URL
-  const [spotifyLink, setSpotifyLink] = useState(""); // Stores Users spotify URL
-
-  // URL Conversion to allow for embeds on profile
+  const [userCategory, setUserCategory] = useState("");
+  const [youtubeLink, setYoutubeLink] = useState("");
+  const [spotifyLink, setSpotifyLink] = useState("");
   const convertToEmbedUrl = (youtubeLink) => {
     const regExp =
       /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
@@ -53,7 +52,7 @@ function EditProfilePage() {
     if (match && match[2].length === 11) {
       return `https://www.youtube.com/embed/${match[2]}`;
     }
-    return null; // If link is invalid return as null
+    return null;
   };
   const convertSpotifyToEmbedUrl = (spotifyLink) => {
     const regExp =
@@ -66,7 +65,6 @@ function EditProfilePage() {
     return null;
   };
 
-  // Initializes state variables for edit form
   const [userDetails, setUserDetails] = useState({
     email: "",
     fullName: "",
@@ -84,7 +82,6 @@ function EditProfilePage() {
     spotifyLink: "",
   });
 
-  // Separate states for gallery files
   const [galleryFiles, setGalleryFiles] = useState([]);
   const [galleryItems, setGalleryItems] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
@@ -101,7 +98,7 @@ function EditProfilePage() {
       const querySnapshot = await getDocs(q);
 
       const items = querySnapshot.docs.map((doc) => ({
-        id: doc.id, // Stores document ID for deletion
+        id: doc.id, // Store document ID for deletion
         ...doc.data(),
       }));
       setGalleryItems(items);
@@ -119,7 +116,7 @@ function EditProfilePage() {
           if (userDetails.youtubeEmbedUrl) {
             const youtubeVideoId = userDetails.youtubeEmbedUrl.split("/").pop();
             const youtubeLink = `https://www.youtube.com/watch?v=${youtubeVideoId}`;
-            setYoutubeLink(youtubeLink); // Sets the state to the retrieved YouTube link
+            setYoutubeLink(youtubeLink);
           }
           if (userDetails.spotifyEmbedUrl) {
             const spotifyParts = userDetails.spotifyEmbedUrl.match(
@@ -129,7 +126,7 @@ function EditProfilePage() {
               const spotifyType = spotifyParts[1];
               const spotifyId = spotifyParts[2];
               const spotifyLink = `https://open.spotify.com/${spotifyType}/${spotifyId}`;
-              setSpotifyLink(spotifyLink); // Sets the state to the retrieved Spotify link
+              setSpotifyLink(spotifyLink);
             }
           }
         } else {
@@ -151,11 +148,11 @@ function EditProfilePage() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === "email") {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // Email validation Regex
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(value)) {
         setEmailError("Please enter a valid email address.");
       } else {
-        setEmailError(""); // Clears any error if the new input is valid
+        setEmailError("");
       }
     }
     if (e.target.name === "birthday") {
@@ -168,27 +165,23 @@ function EditProfilePage() {
       }
       if (age < 16) {
         setBirthdayError("You must be at least 16 years old to register.");
-        return; // Prevents updating the state with the new birthday value
+        return;
       } else {
-        setBirthdayError(""); // Clears any existing error message
+        setBirthdayError("");
       }
     }
     if (e.target.type === "file") {
-      // Handle file input
       setUserDetails((prevDetails) => ({
         ...prevDetails,
-        [e.target.name]: e.target.files[0], // Store File object
+        [e.target.name]: e.target.files[0],
       }));
     } else if (e.target.name === "birthday") {
-      // Handle birthday input and perform age validation
       const { value } = e.target;
       const selectedDate = new Date(value);
       const currentDate = new Date();
       const age = currentDate.getFullYear() - selectedDate.getFullYear();
 
-      // Ensure the user is 16 or older
       if (age < 16) {
-        // Error state if user is not 16 or older
         console.error("User must be 16 years old or older.");
         return;
       }
@@ -198,7 +191,6 @@ function EditProfilePage() {
         [e.target.name]: value,
       }));
     } else {
-      // Handle other form inputs
       const { name, value } = e.target;
       setUserDetails((prevDetails) => ({
         ...prevDetails,
@@ -206,7 +198,6 @@ function EditProfilePage() {
       }));
     }
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -220,7 +211,7 @@ function EditProfilePage() {
       return;
     }
 
-    const youtubeEmbedUrl = convertToEmbedUrl(youtubeLink); // Converts the link to embed URL
+    const youtubeEmbedUrl = convertToEmbedUrl(youtubeLink);
     const spotifyEmbedUrl = convertSpotifyToEmbedUrl(spotifyLink);
 
     try {
@@ -231,10 +222,10 @@ function EditProfilePage() {
 
       const updatedUserDetails = {
         ...userDetails,
-        youtubeEmbedUrl, // Add the embeds to profile details
+        youtubeEmbedUrl,
         spotifyEmbedUrl,
       };
-      delete updatedUserDetails.profilePicture; // Excludes the profile picture File object
+      delete updatedUserDetails.profilePicture;
 
       let profilePictureUrl = userDetails.profilePictureUrl;
       if (userDetails.profilePicture instanceof File) {
@@ -247,10 +238,9 @@ function EditProfilePage() {
           userDetails.profilePicture
         );
         profilePictureUrl = await getDownloadURL(fileSnapshot.ref);
-        updatedUserDetails.profilePictureUrl = profilePictureUrl; // Saves URL instead of File
+        updatedUserDetails.profilePictureUrl = profilePictureUrl;
       }
 
-      // Update Firestore user document
       const userRef = doc(firestore, "users", uid);
       await updateDoc(userRef, updatedUserDetails);
       setLoading(false);
@@ -267,7 +257,7 @@ function EditProfilePage() {
       }
 
       alert("Profile updated successfully!");
-      navigate(`/user-profile/${uid}`); // Redirects to users profile after successful update
+      navigate(`/user-profile/${uid}`);
     } catch (error) {
       console.error(`Error updating profile: ${error}`);
       setError(`Error updating profile: ${error.message}`);
@@ -275,7 +265,6 @@ function EditProfilePage() {
       setLoading(false);
     }
   };
-
   const handleSelectItem = (e, itemId) => {
     if (e.target.checked) {
       setSelectedItems([...selectedItems, itemId]);
@@ -285,8 +274,8 @@ function EditProfilePage() {
   };
 
   const deleteSelectedItems = async () => {
-    const db = getFirestore(); // Get Firestore instance
-    const batch = writeBatch(db); // Create a new batch
+    const db = getFirestore();
+    const batch = writeBatch(db);
 
     for (const itemId of selectedItems) {
       const itemRef = doc(db, "galleryItems", itemId);
@@ -297,8 +286,8 @@ function EditProfilePage() {
       await batch.commit();
       setGalleryItems(
         galleryItems.filter((item) => !selectedItems.includes(item.id))
-      ); // Updates UI
-      setSelectedItems([]); // Clears selection
+      );
+      setSelectedItems([]);
       alert("Selected items deleted successfully!");
     } catch (error) {
       console.error("Error deleting items:", error);
@@ -312,7 +301,7 @@ function EditProfilePage() {
   return (
     <div className="container">
       <div className="edit-profile-container">
-        <h2 style={{ color: "white" }}>Edit Profile</h2>
+        <h2>Create Your Profile</h2>
         <form onSubmit={handleSubmit}>
           <p>Username:</p>
           <div className="input-with-info">
@@ -399,7 +388,7 @@ function EditProfilePage() {
             />
             <span
               className="info-icon"
-              data-tooltip="Enter your birth date. Must be 16 or older."
+              data-tooltip="Enter your birth date. Must be 18 or older."
             >
               i
             </span>
@@ -477,7 +466,7 @@ function EditProfilePage() {
               i
             </span>
           </div>
-          {/* Conditional inputs for musician category*/}
+          {/* Conditional inputs for musicians */}
           {userCategory === "Musician" && (
             <>
               <p>Role:</p>
@@ -534,7 +523,7 @@ function EditProfilePage() {
             </>
           )}
 
-          {/* Conditional inputs for venue category*/}
+          {/* Conditional inputs for venues */}
           {userCategory === "Venue" && (
             <>
               <p>Preferred Styles:</p>
@@ -594,7 +583,7 @@ function EditProfilePage() {
             <input
               name="disabilities"
               onChange={handleChange}
-              value={userDetails.disabilities}
+              value={userDetails.disabilities || ""}
               placeholder="Disabilities"
             />
             <span
@@ -605,10 +594,6 @@ function EditProfilePage() {
             </span>
           </div>
           <p>YouTube Embed:</p>
-          <p className="small-text">
-            {" "}
-            If the field is empty please re-enter your URL link for display.
-          </p>
           <div className="input-with-info">
             <input
               type="text"
@@ -625,10 +610,6 @@ function EditProfilePage() {
             </span>
           </div>
           <p>Spotify Embed:</p>
-          <p className="small-text">
-            {" "}
-            If the field is empty please re-enter your URL link for display.
-          </p>
           <div className="input-with-info">
             <input
               type="text"
@@ -734,7 +715,6 @@ function EditProfilePage() {
             </span>
           </div>
 
-          {/* Maps over gallery items with delete option */}
           <div className="input-with-info">
             {galleryItems.map((item) => (
               <div key={item.id} className="gallery-items-container">
@@ -782,4 +762,4 @@ function EditProfilePage() {
   );
 }
 
-export default EditProfilePage;
+export default RegisterPage;

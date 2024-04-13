@@ -1,16 +1,21 @@
+// Sets Variables
 require("dotenv").config();
 const { google } = require("googleapis");
 const admin = require("firebase-admin");
+const express = require("express");
+const app = express();
+
+app.use(cors());
 
 const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
+  "556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com",
+  "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",
+  "http://localhost:3000"
 );
 
-const scopes = ["https://www.googleapis.com/auth/calendar.readonly"];
+const scopes = ["https://www.googleapis.com/auth/calendar"];
 
-// Generate a URL so the user can give the app permission to access their calendar
+// Generates a URL so the user can give the app permission to access their calendar
 app.get("/auth/google", (req, res) => {
   const url = oauth2Client.generateAuthUrl({
     access_type: "offline",
@@ -19,7 +24,7 @@ app.get("/auth/google", (req, res) => {
   res.redirect(url);
 });
 
-// The redirect URI where the user will be sent after authorization
+// Redirect URI where the user will be sent after authorization
 app.get("/auth/google/callback", async (req, res) => {
   const { code } = req.query;
   try {
@@ -49,7 +54,7 @@ async function refreshAccessToken() {
 }
 
 // Initialize Firebase Admin
-const serviceAccount = require("./path-to-your-firebase-adminsdk.json");
+const serviceAccount = require("../gigify-0000a-firebase-adminsdk-pw3hh-1aa2ee7e31.json");
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -59,11 +64,11 @@ const db = admin.firestore();
 
 // Initialize Google Calendar API
 const { client_secret, client_id, redirect_uris } =
-  require("./credentials.json").web;
+  require("../client_secret_556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com.json").web;
 const oAuth2Client = new google.auth.OAuth2(
   client_id,
   client_secret,
-  redirect_uris[0]
+  redirect_uris[7]
 );
 
 // Assuming you have the access token stored in an environment variable or some other secure place
@@ -71,3 +76,6 @@ const accessToken = process.env.ACCESS_TOKEN; // You need to implement the logic
 oAuth2Client.setCredentials({ access_token: accessToken });
 
 const calendar = google.calendar({ version: "v3", auth: oAuth2Client });
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
