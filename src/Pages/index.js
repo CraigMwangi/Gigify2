@@ -10,7 +10,7 @@ app.use(cors());
 const oauth2Client = new google.auth.OAuth2(
   "556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com",
   "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",
-  "http://localhost:3000"
+  "https://craigmwangi.github.io"
 );
 
 const scopes = ["https://www.googleapis.com/auth/calendar"];
