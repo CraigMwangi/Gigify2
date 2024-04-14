@@ -73,7 +73,7 @@ function UserProfilePage() {
             .init({
               apiKey: "AIzaSyDfNCiZBEE0pxF-7O8Tb7U7HWSPefje50Q",
               clientId:
-                "556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com",
+                "556828166349-eihecs9ghgt50t07cg8v5ntl1lpqb490.apps.googleusercontent.com",
               discoveryDocs: [
                 "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest",
               ],
