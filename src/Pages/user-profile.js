@@ -94,7 +94,7 @@ function UserProfilePage() {
     };
 
     const fetchGoogleCalendarEvents = () => {
-      if (gapi.client && gapi.client.calendar && currentUser.uid === uid) {
+      if (gapi.client && gapi.client.calendar) {
         gapi.client.calendar.events
           .list({
             calendarId: "primary",
@@ -105,13 +105,14 @@ function UserProfilePage() {
             orderBy: "startTime",
           })
           .then((response) => {
-            const formattedEvents = response.result.items.map((event) => ({
+            const items = response.result.items;
+            const formattedEvents = items.map((event) => ({
               id: event.id,
               title: event.summary,
               start: new Date(event.start.dateTime || event.start.date),
               end: new Date(event.end.dateTime || event.end.date),
               description: event.description || "",
-              location: event.location || "No location provided",
+              location: event.location || "Location not provided",
               isCancelled: event.status === "cancelled",
             }));
             setEvents(formattedEvents);
