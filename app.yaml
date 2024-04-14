@@ -1,0 +1,10 @@
+runtime: nodejs18
+env: standard
+instance_class: F1
+
+env_variables:
+  # Set your environment-specific variables here
+  NODE_ENV: "production"
+  CLIENT_ID: "556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com"
+  CLIENT_SECRET: "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"
+  API_KEY: "AIzaSyDfNCiZBEE0pxF-7O8Tb7U7HWSPefje50Q"

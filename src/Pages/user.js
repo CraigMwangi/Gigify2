@@ -70,8 +70,9 @@ function UserPage() {
         if (!gapi.auth2.getAuthInstance()) {
           gapi.auth2
             .init({
-              apiKey: process.env.REACT_APP_GOOGLE_API_KEY,
-              clientId: process.env.REACT_APP_GOOGLE_CLIENT_ID,
+              apiKey: "AIzaSyDfNCiZBEE0pxF-7O8Tb7U7HWSPefje50Q",
+              clientId:
+                "556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com",
               discoveryDocs: [
                 "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest",
               ],

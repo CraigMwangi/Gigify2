@@ -4,13 +4,18 @@ const { google } = require("googleapis");
 const admin = require("firebase-admin");
 const express = require("express");
 const app = express();
+const cors = require("cors");
 
-app.use(cors());
+app.use(
+  cors({
+    origin: "https://craigmwangi.github.io",
+  })
+);
 
 const oauth2Client = new google.auth.OAuth2(
   "556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com",
   "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",
-  "https://craigmwangi.github.io"
+  "https://craigmwangi.github.io/auth/google/callback"
 );
 
 const scopes = ["https://www.googleapis.com/auth/calendar"];
@@ -63,11 +68,11 @@ admin.initializeApp({
 const db = admin.firestore();
 
 // Initialize Google Calendar API
-const { client_secret, client_id, redirect_uris } =
-  require("../client_secret_556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com.json").web;
+require("../client_secret_556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com.json")
+  .web;
 const oAuth2Client = new google.auth.OAuth2(
-  client_id,
-  client_secret,
+  "556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com",
+  "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",
   redirect_uris[7]
 );
 
