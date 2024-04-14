@@ -1,0 +1,16 @@
+{
+  "files": {
+    "main.css": "/Gigify2/static/css/main.8f3dfc57.css",
+    "main.js": "/Gigify2/static/js/main.82bdb7a2.js",
+    "static/js/592.44dc0451.chunk.js": "/Gigify2/static/js/592.44dc0451.chunk.js",
+    "static/media/gigifylogo1.png": "/Gigify2/static/media/gigifylogo1.2a2acf8253c874beb4e4.png",
+    "index.html": "/Gigify2/index.html",
+    "main.8f3dfc57.css.map": "/Gigify2/static/css/main.8f3dfc57.css.map",
+    "main.82bdb7a2.js.map": "/Gigify2/static/js/main.82bdb7a2.js.map",
+    "592.44dc0451.chunk.js.map": "/Gigify2/static/js/592.44dc0451.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.8f3dfc57.css",
+    "static/js/main.82bdb7a2.js"
+  ]
+}
