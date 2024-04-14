@@ -48,7 +48,7 @@ function Navbar() {
                 <Link to="/feed">Feed</Link>
               </li>
               <li>
-                <Link to={`/user-profile/:uid`}>My Account</Link>
+                <Link to={`/user-profile/${currentUser.uid}`}>My Account</Link>
               </li>
               <li>
                 <Link to={`/edit-profile/${currentUser.uid}`}>
