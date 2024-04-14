@@ -55,6 +55,78 @@ function UserProfilePage() {
   };
 
   // Load for Google Calendar API
+
+  useEffect(() => {
+    // Function to initialize Google API client
+    const loadGoogleApi = () => {
+      const script = document.createElement("script");
+      script.src = "https://apis.google.com/js/api.js";
+      script.onload = () => {
+        gapi.load("client:auth2", initClient);
+      };
+      document.body.appendChild(script);
+    };
+
+    const initClient = () => {
+      gapi.load("client:auth2", () => {
+        if (!gapi.auth2.getAuthInstance()) {
+          gapi.auth2
+            .init({
+              apiKey: "AIzaSyDfNCiZBEE0pxF-7O8Tb7U7HWSPefje50Q",
+              clientId:
+                "556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com",
+              discoveryDocs: [
+                "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest",
+              ],
+              scope: "https://www.googleapis.com/auth/calendar.events",
+            })
+            .then(() => {
+              fetchGoogleCalendarEvents();
+            })
+            .catch((err) => {
+              console.error("Error initializing Google API client: ", err);
+              setError("Google Calendar cannot be loaded");
+            });
+        } else {
+          fetchGoogleCalendarEvents();
+        }
+      });
+    };
+
+    const fetchGoogleCalendarEvents = () => {
+      if (gapi.client && gapi.client.calendar && currentUser.uid === uid) {
+        gapi.client.calendar.events
+          .list({
+            calendarId: "primary",
+            timeMin: new Date().toISOString(),
+            showDeleted: false,
+            singleEvents: true,
+            maxResults: 10,
+            orderBy: "startTime",
+          })
+          .then((response) => {
+            const formattedEvents = response.result.items.map((event) => ({
+              id: event.id,
+              title: event.summary,
+              start: new Date(event.start.dateTime || event.start.date),
+              end: new Date(event.end.dateTime || event.end.date),
+              description: event.description || "",
+              location: event.location || "No location provided",
+              isCancelled: event.status === "cancelled",
+            }));
+            setEvents(formattedEvents);
+          })
+          .catch((error) => {
+            console.error("Error fetching Google Calendar events: ", error);
+            // Do not set global error, just log this specific error
+          });
+      }
+    };
+
+    // Load Google API on component mount
+    loadGoogleApi();
+  }, [currentUser.uid, uid]); // Dependency array to control effect re-run
+
   // Fetches user profile data from Firestore
 
   useEffect(() => {
