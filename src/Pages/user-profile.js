@@ -56,79 +56,82 @@ function UserProfilePage() {
 
   // Load for Google Calendar API
 
-  // useEffect(() => {
-  //   function loadGoogleApi() {
-  //     const script = document.createElement("script");
-  //     script.src = "https://apis.google.com/js/api.js";
-  //     script.onload = () => {
-  //       gapi.load("client:auth2", initClient);
-  //     };
-  //     document.body.appendChild(script);
-  //   }
+  useEffect(() => {
+    async function loadGoogleApi() {
+      const script = document.createElement("script");
+      script.src = "https://apis.google.com/js/api.js";
+      script.onload = () => {
+        gapi.load("client:auth2", initClient);
+      };
+      document.body.appendChild(script);
+    }
 
-  //   function initClient() {
-  //     gapi.load("client:auth2", () => {
-  //       if (!gapi.auth2.getAuthInstance()) {
-  //         gapi.auth2
-  //           .init({
-  //             apiKey: "AIzaSyDfNCiZBEE0pxF-7O8Tb7U7HWSPefje50Q",
-  //             clientId:
-  //               "556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com",
-  //             discoveryDocs: [
-  //               "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest",
-  //             ],
-  //             scope: "https://www.googleapis.com/auth/calendar.events",
-  //           })
-  //           .then(() => {
-  //             fetchGoogleCalendarEvents();
-  //           })
-  //           .catch((err) => {
-  //             console.error("Error initializing Google API client: ", err);
-  //           });
-  //       } else {
-  //         fetchGoogleCalendarEvents();
-  //       }
-  //     });
-  //   }
+    function initClient() {
+      gapi.load("client:auth2", () => {
+        if (!gapi.auth2.getAuthInstance()) {
+          gapi.auth2
+            .init({
+              apiKey: "AIzaSyDfNCiZBEE0pxF-7O8Tb7U7HWSPefje50Q",
+              clientId:
+                "556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com",
+              discoveryDocs: [
+                "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest",
+              ],
+              scope: "https://www.googleapis.com/auth/calendar.events",
+            })
+            .then(() => {
+              fetchGoogleCalendarEvents();
+            })
+            .catch((err) => {
+              console.error("Error initializing Google API client: ", err);
+            });
+        } else {
+          fetchGoogleCalendarEvents();
+        }
+      });
+    }
 
-  //   loadGoogleApi();
-  // }, []);
+    loadGoogleApi();
+  }, []);
 
-  // Fetching Google Calendar events specific to the logged-in user
-  // const fetchGoogleCalendarEvents = () => {
-  //   if (gapi.client && gapi.client.calendar) {
-  //     gapi.client.calendar.events
-  //       .list({
-  //         calendarId: "primary",
-  //         timeMin: new Date().toISOString(),
-  //         showDeleted: false,
-  //         singleEvents: true,
-  //         maxResults: 10,
-  //         orderBy: "startTime",
-  //       })
-  //       .then((response) => {
-  //         const items = response.result.items;
-  //         const formattedEvents = items.map((event) => ({
-  //           id: event.id,
-  //           title: event.summary,
-  //           start: new Date(event.start.dateTime || event.start.date),
-  //           end: new Date(event.end.dateTime || event.end.date),
-  //           description: event.description || "",
-  //           location: event.location || "Location not provided",
-  //           isCancelled: event.status === "cancelled",
-  //         }));
-  //         setEvents(formattedEvents);
-  //       })
-  //       .catch((error) => {
-  //         console.error("Error fetching Google Calendar events: ", error);
-  //         setError("Failed to fetch Google Calendar events.");
-  //       });
-  //   } else {
-  //     console.log(
-  //       "Google API client is not initialized or current user is undefined"
-  //     );
-  //   }
-  // };
+  const fetchGoogleCalendarEvents = () => {
+    if (uid == currentUser.uid) {
+      if (gapi.client && gapi.client.calendar) {
+        gapi.client.calendar.events
+          .list({
+            calendarId: "primary",
+            timeMin: new Date().toISOString(),
+            showDeleted: false,
+            singleEvents: true,
+            maxResults: 10,
+            orderBy: "startTime",
+          })
+          .then((response) => {
+            const items = response.result.items;
+            const formattedEvents = items.map((event) => ({
+              id: event.id,
+              title: event.summary,
+              start: new Date(event.start.dateTime || event.start.date),
+              end: new Date(event.end.dateTime || event.end.date),
+              description: event.description || "",
+              location: event.location || "Location not provided",
+              isCancelled: event.status === "cancelled",
+            }));
+            setEvents(formattedEvents);
+          })
+          .catch((error) => {
+            console.error("Error fetching Google Calendar events: ", error);
+            setError("Failed to fetch Google Calendar events.");
+          });
+      } else {
+        console.log(
+          "Google API client is not initialized or no user is currently logged in"
+        );
+      }
+    } else {
+      setEvents([]); // Clears any existing events from the state
+    }
+  };
 
   // Fetches user profile data from Firestore
 
