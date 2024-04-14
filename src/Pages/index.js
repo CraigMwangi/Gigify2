@@ -67,15 +67,6 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-// Initialize Google Calendar API
-require("../client_secret_556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com.json")
-  .web;
-const oAuth2Client = new google.auth.OAuth2(
-  "556828166349-jjodibfl9b6g3djt6r0hq93go56qjprr.apps.googleusercontent.com",
-  "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",
-  redirect_uris[7]
-);
-
 // Assuming you have the access token stored in an environment variable or some other secure place
 const accessToken = process.env.ACCESS_TOKEN; // You need to implement the logic to obtain this
 oAuth2Client.setCredentials({ access_token: accessToken });
