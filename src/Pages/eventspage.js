@@ -67,8 +67,6 @@ const EventsPage = () => {
     }
   };
 
-  const [userDetails, setUserDetails] = useState();
-
   const navigate = useNavigate();
 
   const handleFilterChange = (e) => {
@@ -133,6 +131,8 @@ const EventsPage = () => {
       alert("Failed to add event to favorites.");
     }
   };
+
+  // Attach this function to some handler or useEffect depending on when you want to trigger it
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -293,7 +293,7 @@ const EventsPage = () => {
 
     const contactedEventsRef = collection(firestore, "contactedEvents");
     const contactedEvent = {
-      eventId: selectedEvent.id,
+      eventId: event.id,
       uid: currentUser.uid,
       creatorEmail: event.email,
     };
@@ -436,7 +436,20 @@ const EventsPage = () => {
 
   // Adds new event to MyEvents Page
   const handleNewEventAdded = (newEvent) => {
-    setEvents((prevEvents) => [...prevEvents, newEvent]);
+    setEvents((prevEvents) => {
+      const existingEventIndex = prevEvents.findIndex(
+        (event) => event.id === newEvent.id
+      );
+      if (existingEventIndex > -1) {
+        // Update the existing event
+        const updatedEvents = [...prevEvents];
+        updatedEvents[existingEventIndex] = newEvent;
+        return updatedEvents;
+      } else {
+        // Add a new event
+        return [...prevEvents, newEvent];
+      }
+    });
   };
 
   if (loading) return <div>Loading...</div>;

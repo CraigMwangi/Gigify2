@@ -3,15 +3,17 @@ import emailjs from "emailjs-com";
 import {
   doc,
   getDoc,
-  updateDoc,
   collection,
   addDoc,
   getDocs,
   Timestamp,
+  query,
+  where,
 } from "firebase/firestore";
 import { firestore, storage } from "../components/firebase/firebaseConfig";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { gapi } from "gapi-script";
+import { useAuth } from "../components/firebase/AuthContext";
 
 const EmailModal = ({
   isOpen,
@@ -26,17 +28,52 @@ const EmailModal = ({
     userMessage: "",
   });
 
-  const [events, setEvents] = useState([]); // State to store fetched events
   const [error, setError] = useState(""); // State to store fetching errors
-
+  const { currentUser } = useAuth();
+  const [selectedEvent, setSelectedEvent] = useState(null);
   const navigate = useNavigate();
   const { eventId } = useParams(); // Obtains event Id based on event parameters
-  const { uid } = useParams(); // Obtains uid based on users parameters
   const [eventDetails, setEventDetails] = useState(null);
   const [emailSent, setEmailSent] = useState(false); // State to track if the email has been sent
   const getDirectionsUrl = (event) => {
     const { lat, lng } = event;
     return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  };
+
+  const addToContactedEvents = async (event) => {
+    if (!currentUser) {
+      alert("Please log in to contact about an event.");
+      return;
+    }
+
+    if (!selectedEvent) {
+      alert("No event selected to contact about.");
+      return;
+    }
+
+    const contactedEventsRef = collection(firestore, "contactedEvents");
+    try {
+      const q = query(
+        contactedEventsRef,
+        where("eventId", "==", event.id),
+        where("uid", "==", currentUser.uid)
+      );
+      const querySnapshot = await getDocs(q);
+      if (querySnapshot.empty) {
+        await addDoc(contactedEventsRef, {
+          uid: currentUser.uid,
+          eventId: event.id,
+          timestamp: Timestamp.now(),
+        });
+        console.log("Event contact has been noted in Firestore.");
+        alert("Event contact has been noted!");
+      } else {
+        alert("You have already contacted about this event.");
+      }
+    } catch (error) {
+      console.error("Error adding event to contacted events: ", error);
+      alert("Failed to note event contact.");
+    }
   };
 
   useEffect(() => {
@@ -83,7 +120,7 @@ const EmailModal = ({
     setUserDetails((prevDetails) => ({ ...prevDetails, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setEmailSent(false); // Resets email sent status each time the form is submitted
     const eventDetailsUrl = `http://localhost:3000/event/${eventId}`;
@@ -132,34 +169,18 @@ const EmailModal = ({
           5000
         );
       })
-      .catch(
-        (error) => {
-          console.error("Failed to send email:", error);
-          // Trigger an error notification in the parent component
-          setNotification({
-            show: true,
-            message: "Failed to send your message. Please try again.",
-            type: "error",
-          });
-          // Saves the event contact information to Firestore to add to My Events Page
-          const contactedEventsRef = collection(firestore, "contactedEvents");
-          const contactedEvent = {
-            eventId: event.id,
-            timestamp: Timestamp.now(),
-          };
+      .catch((error) => {
+        console.error("Failed to send email:", error);
+        // Trigger an error notification in the parent component
+        setNotification({
+          show: true,
+          message: "Failed to send your message. Please try again.",
+          type: "error",
+        });
 
-          addDoc(contactedEventsRef, contactedEvent)
-            .then(() => {
-              console.log("Event contact has been noted in Firestore!");
-            })
-            .catch((error) => {
-              console.error("Error noting event contact in Firestore: ", error);
-            });
-        },
-        (error) => {
-          console.log("Failed to send email:", error);
-        }
-      );
+        // Saves the event contact information to Firestore to add to My Events Page
+        addToContactedEvents();
+      });
   };
 
   if (!isOpen) return null;

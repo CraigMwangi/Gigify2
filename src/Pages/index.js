@@ -36,7 +36,7 @@ app.get("/auth/google/callback", async (req, res) => {
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
     res.send("Authorization successful. You can now close this page.");
-    // Store tokens securely for later use (e.g., in a database)
+    // Store tokens securely for later use
     console.log(tokens);
   } catch (error) {
     console.error("Error getting tokens:", error);
@@ -67,8 +67,7 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-// Assuming you have the access token stored in an environment variable or some other secure place
-const accessToken = process.env.ACCESS_TOKEN; // You need to implement the logic to obtain this
+const accessToken = process.env.ACCESS_TOKEN;
 oAuth2Client.setCredentials({ access_token: accessToken });
 
 const calendar = google.calendar({ version: "v3", auth: oAuth2Client });

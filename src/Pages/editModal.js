@@ -30,7 +30,6 @@ const EditEventModal = ({
   useEffect(() => {
     // Sets the form data when the modal opens with an pre-existing event details
     if (event) {
-      // Check if event.start is a Firestore Timestamp and converts it if necessary to avoid errors
       const start =
         event.start instanceof Timestamp
           ? event.start.toDate().toISOString().substring(0, 16)
@@ -73,7 +72,12 @@ const EditEventModal = ({
     // Updates the event document in Firestore
     const eventRef = doc(firestore, "events", event.id);
     await updateDoc(eventRef, dataToSave);
-    onSave(dataToSave);
+    onSave({
+      ...event,
+      ...dataToSave,
+      start: new Date(dataToSave.start),
+      end: new Date(dataToSave.end),
+    });
     onClose(); // Close the modal after saving
   };
 
@@ -89,7 +93,7 @@ const EditEventModal = ({
       }
 
       onDelete(event.id); // Informs parent component to remove the event from the state
-      onClose(); // Close the modal after deletion
+      onClose(); // Closes the modal after deletion
     }
   };
 

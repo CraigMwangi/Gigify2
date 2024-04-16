@@ -15,6 +15,7 @@ import { firestore } from "../components/firebase/firebaseConfig";
 import { useAuth } from "../components/firebase/AuthContext";
 import EditEventModal from "./editModal";
 import EmailModal from "./emailModal";
+import { ref, deleteObject, getStorage } from "firebase/storage";
 
 const MyEventsPage = () => {
   const { currentUser } = useAuth();
@@ -27,6 +28,7 @@ const MyEventsPage = () => {
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const navigate = useNavigate();
+  const storage = getStorage();
 
   // Fetch events created by the user
   useEffect(() => {
@@ -109,6 +111,24 @@ const MyEventsPage = () => {
 
   const handleSeeEvent = () => {
     navigate(`/events`);
+  };
+
+  const handleSave = async (updatedEvent) => {
+    const eventRef = doc(firestore, "events", updatedEvent.id);
+    try {
+      await updateDoc(eventRef, updatedEvent);
+      setIsEditModalOpen(false);
+      console.log("Event updated successfully!");
+    } catch (error) {
+      console.error("Error updating event:", error);
+    }
+  };
+
+  const handleDelete = (eventId) => {
+    setCreatedEvents((prevEvents) =>
+      prevEvents.filter((event) => event.id !== eventId)
+    );
+    handleCloseModal();
   };
 
   if (loading) return <div>Loading...</div>;
@@ -219,6 +239,8 @@ const MyEventsPage = () => {
         <EditEventModal
           isOpen={isEditModalOpen}
           onClose={handleCloseModal}
+          onSave={handleSave}
+          onDelete={handleDelete}
           event={createdEvents.find((e) => e.id === editEventId)}
         />
       )}
