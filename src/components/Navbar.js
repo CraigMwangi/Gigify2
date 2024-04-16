@@ -22,6 +22,12 @@ function Navbar() {
       <Link to="/home">
         <img src={Logo} alt="Gigify Logo" className="navbar-logo" />
       </Link>
+      <button
+        className="menu-button"
+        onClick={() => document.body.classList.toggle("menu-open")}
+      >
+        ☰
+      </button>
       <nav>
         <ul>
           <li>

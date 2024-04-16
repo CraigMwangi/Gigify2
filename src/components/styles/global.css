@@ -886,7 +886,7 @@ form {
 .navbar {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   padding: 20px;
   background-color: rgb(131, 131, 131);
@@ -898,6 +898,15 @@ form {
   z-index: 1000;
   transition: background-color 0.3s;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.menu-button {
+  display: none; /* Hidden by default */
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 30px;
+  cursor: pointer;
 }
 
 .navbar nav ul {
@@ -1047,6 +1056,29 @@ form {
   }
   .modal-content {
     width: 80%;
+  }
+  .navbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .menu-button {
+    display: block; /* Show menu button on smaller screens */
+  }
+
+  .navbar nav ul {
+    flex-direction: column;
+    width: 100%;
+    display: none; /* Hidden by default */
+  }
+
+  .navbar nav ul li {
+    text-align: center;
+    width: 100%;
+  }
+
+  body.menu-open .navbar nav ul {
+    display: flex; /* Show menu when open */
   }
 }
 
