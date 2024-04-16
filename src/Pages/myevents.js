@@ -151,8 +151,6 @@ const MyEventsPage = () => {
           <div key={event.id}>
             <h3>{event.title}</h3>
             <p>{event.genre}</p>
-            <p>Start: {event.start.toLocaleString()}</p>
-            <p>End: {event.end.toLocaleString()}</p>
             <p>Description: {event.description}</p>
             <p>Location: {event.location}</p>
             <p>Capacity: {event.capacity}</p>
