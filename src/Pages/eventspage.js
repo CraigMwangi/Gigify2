@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { gapi } from "gapi-script";
 import {
   collection,
@@ -319,7 +319,7 @@ const EventsPage = () => {
     }
   };
 
-  const handleAddToGoogleCalendar = async (event, eventId) => {
+  const handleAddToGoogleCalendar = async (event, eventId, uid) => {
     // Construct the URL for the event details page using the event's ID
     const eventDetailsUrl = `http://localhost:3000/event/${eventId}`; // URL to link to event on website from Google Calendar
     const eventTitleWithPrefix = `[AppEvent]${event.title}`; // Tagging the event with the idenifier
@@ -341,6 +341,7 @@ const EventsPage = () => {
         private: {
           appIdentifier: "YourAppIdentifier",
           genre: event.genre, // Store the genre in extendedProperties
+          userId: currentUser.uid,
         },
       },
     };

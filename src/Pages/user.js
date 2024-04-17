@@ -18,13 +18,13 @@ import { Calendar, momentLocalizer } from "react-big-calendar";
 import moment from "moment";
 import { gapi } from "gapi-script";
 import "react-big-calendar/lib/css/react-big-calendar.css";
-import MapModal from "./mapModal";
 import Notifications from "./notifications";
+import CalendarModal from "./calendarModal";
 
 const localizer = momentLocalizer(moment);
 
 function UserPage() {
-  // Hooks for various states
+  // Hooks for various states also used in UserProfile to simulate the view of another profile
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const { uid } = useParams();
@@ -94,41 +94,41 @@ function UserPage() {
   }, []);
 
   const fetchGoogleCalendarEvents = () => {
-    if (uid == currentUser.uid) {
-      if (gapi.client && gapi.client.calendar) {
-        gapi.client.calendar.events
-          .list({
-            calendarId: "primary",
-            timeMin: new Date().toISOString(),
-            showDeleted: false,
-            singleEvents: true,
-            maxResults: 10,
-            orderBy: "startTime",
-          })
-          .then((response) => {
-            const items = response.result.items;
-            const formattedEvents = items.map((event) => ({
-              id: event.id,
-              title: event.summary,
-              start: new Date(event.start.dateTime || event.start.date),
-              end: new Date(event.end.dateTime || event.end.date),
-              description: event.description || "",
-              location: event.location || "Location not provided",
-              isCancelled: event.status === "cancelled",
-            }));
-            setEvents(formattedEvents);
-          })
-          .catch((error) => {
-            console.error("Error fetching Google Calendar events: ", error);
-            setError("Failed to fetch Google Calendar events.");
-          });
-      } else {
-        console.log(
-          "Google API client is not initialized or no user is currently logged in"
-        );
-      }
+    if (gapi.client && gapi.client.calendar && uid) {
+      gapi.client.calendar.events
+        .list({
+          calendarId: "primary",
+          timeMin: new Date().toISOString(),
+          showDeleted: false,
+          singleEvents: true,
+          maxResults: 10,
+          orderBy: "startTime",
+          privateExtendedProperty: `userId=${uid}`,
+        })
+        .then((response) => {
+          const items = response.result.items;
+          const formattedEvents = items.map((event) => ({
+            id: event.id,
+            title: event.summary,
+            start: new Date(event.start.dateTime || event.start.date),
+            end: new Date(event.end.dateTime || event.end.date),
+            description: event.description || "",
+            location: event.location || "Location not provided",
+            isCancelled: event.status === "cancelled",
+          }));
+          setEvents(formattedEvents);
+        })
+        .catch((error) => {
+          console.error("Error fetching Google Calendar events: ", error);
+          setError("Failed to fetch Google Calendar events.");
+        });
     } else {
-      setEvents([]); // Clears any existing events from the state
+      console.log(
+        "Google API client is not initialized or no user is currently logged in"
+      );
+      setError(
+        "Google API client is not initialized or no user is currently logged in"
+      );
     }
   };
 
@@ -534,7 +534,7 @@ function UserPage() {
             onSelectEvent={handleSelectEvent}
           />
         </div>
-        <MapModal
+        <CalendarModal
           event={selectedEvent}
           isOpen={isModalOpen}
           onClose={() => {

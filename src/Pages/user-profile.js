@@ -57,7 +57,7 @@ function UserProfilePage() {
   // Load for Google Calendar API
 
   useEffect(() => {
-    function loadGoogleApi() {
+    async function loadGoogleApi() {
       const script = document.createElement("script");
       script.src = "https://apis.google.com/js/api.js";
       script.onload = () => {
@@ -94,9 +94,8 @@ function UserProfilePage() {
     loadGoogleApi();
   }, []);
 
-  //Fetching Google Calendar events specific to the logged-in user
   const fetchGoogleCalendarEvents = () => {
-    if (gapi.client && gapi.client.calendar) {
+    if (gapi.client && gapi.client.calendar && uid) {
       gapi.client.calendar.events
         .list({
           calendarId: "primary",
@@ -105,6 +104,7 @@ function UserProfilePage() {
           singleEvents: true,
           maxResults: 10,
           orderBy: "startTime",
+          privateExtendedProperty: `userId=${uid}`,
         })
         .then((response) => {
           const items = response.result.items;
@@ -125,7 +125,10 @@ function UserProfilePage() {
         });
     } else {
       console.log(
-        "Google API client is not initialized or current user is undefined"
+        "Google API client is not initialized or no user is currently logged in"
+      );
+      setError(
+        "Google API client is not initialized or no user is currently logged in"
       );
     }
   };
