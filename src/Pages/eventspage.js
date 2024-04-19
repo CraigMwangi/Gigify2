@@ -55,7 +55,7 @@ const EventsPage = () => {
     const notificationsRef = collection(firestore, "notifications");
     const notification = {
       receiverId: creatorId,
-      message: `Your event (${eventId}) has been favorited by another user.`,
+      message: `Your event (${eventId}) has been favourited by another user.`,
       read: false,
       createdAt: new Date(),
     };
@@ -97,7 +97,7 @@ const EventsPage = () => {
 
   const addToFavorites = async (event) => {
     if (!currentUser) {
-      alert("Please log in to add favorites.");
+      alert("Please log in to add favourites.");
       return;
     }
 
@@ -116,7 +116,7 @@ const EventsPage = () => {
       const querySnapshot = await getDocs(q);
       if (querySnapshot.empty) {
         await addDoc(favoritesRef, favorite);
-        alert("Event added to favorites!");
+        alert("Event added to favourites!");
 
         // Check if the event's creator is different from the current user
         if (event.uid !== currentUser.uid) {
@@ -124,11 +124,11 @@ const EventsPage = () => {
           await createNotification(event.id, event.uid);
         }
       } else {
-        alert("This event is already in your favorites.");
+        alert("This event is already in your favourites.");
       }
     } catch (error) {
-      console.error("Error adding event to favorites: ", error);
-      alert("Failed to add event to favorites.");
+      console.error("Error adding event to favourites: ", error);
+      alert("Failed to add event to favourites.");
     }
   };
 
@@ -628,7 +628,7 @@ const EventsPage = () => {
                   onClick={() => addToFavorites(event)}
                   className="button"
                 >
-                  Favorite
+                  Favourite
                 </button>
                 <button onClick={() => acceptEvent(event)} className="button">
                   Accept Event

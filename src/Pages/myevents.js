@@ -145,7 +145,7 @@ const MyEventsPage = () => {
           </button>
         </div>
       ))}
-      <h2 className="centre-text">My Favorite Events</h2>
+      <h2 className="centre-text">My Favourite Events</h2>
       {favorites.length > 0 ? (
         favorites.map((event) => (
           <div key={event.id}>
